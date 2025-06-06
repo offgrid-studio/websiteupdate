@@ -25,8 +25,37 @@ body {
   transform-origin: center center;
 }
 
-#sheetTable li:hover {
-  transform: scale(1.2);
+/* move columns */
+#sheetTable td:nth-child(4),
+#sheetTable th:nth-child(4) {
+  width: 5%;           /* Fixed width for the "Year" column */
+  white-space: wrap;
+}
+
+/* move columns */
+#sheetTable td:nth-child(3),
+#sheetTable th:nth-child(3) {
+  width: 15%;           /* Fixed width for the "Year" column */
+  white-space: wrap;
+}
+
+/* move columns */
+#sheetTable td:nth-child(2),
+#sheetTable th:nth-child(2) {
+  width: 20%;           /* Fixed width for the "Year" column */
+  white-space: wrap;
+}
+
+/* move columns */
+#sheetTable td:nth-child(1),
+#sheetTable th:nth-child(1) {
+  width: 20%;           /* Fixed width for the "Year" column */
+  white-space: wrap;
+}
+
+#sheetTable td:last-child,
+#sheetTable th:last-child {
+  width: auto;           /* Allow this to grow */
 }
 
 #sheetTable td {

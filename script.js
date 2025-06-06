@@ -10,7 +10,7 @@ function formatGifURL(pathFromSheet) {
 }
 /*GIF*/
 
-/*GOOGLE SHEET LOADED*/
+/*LOAD GOOGLE SHEET */
 async function loadCSV() {
   const response = await fetch("https://docs.google.com/spreadsheets/d/164ps6mI666JLt-q4iVb0FMA5ztPykwRT4mOVAE_zbwE/export?format=csv&gid=11925201");
   const csvText = await response.text();
@@ -24,10 +24,12 @@ async function loadCSV() {
   filteredRows = [...dataRows]; // ✅ correct placement
 /*GOOGLE SHEET LOADED*/
 
-// CATEG
+
+
+/*CREATE CAT-BAR*/
 document.getElementById("categoryFilters").classList.add("sticky-category-bar");
 renderCategoryPills(); // ✅ moved down to after dataRows
-// CATEG
+/*CAT-BAR CREATED*/
 
 /*DONT DISPLAY F ONWARDS OF GOOGLESHEET*/
 thead.innerHTML = ""; // ✅ clear any old headers
@@ -101,9 +103,9 @@ tr.dataset.previewImage = formattedUrl;
     }
 /*!!TABLE(LIST) IS "RENDERED!!*/
 
-/*MOUSEOVER STUFF*/
-/*MOUSEOVER IMAGE PREVIEW*/
-    tr.addEventListener("mouseenter", () => {
+//!!!👇 THIS IS WHERE WE BUILD THE MOUSE INTERACTION 
+/*MOUSEOVER: IMAGE PREVIEW + RESIZE*/
+tr.addEventListener("mouseenter", () => {
   const preview = document.getElementById("imagePreview");
   const content = document.getElementById("previewContent");
   content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
@@ -114,6 +116,20 @@ tr.dataset.previewImage = formattedUrl;
 
   // Cancel any hide timers
   clearTimeout(preview.hideTimer);
+
+  // ✅ NEW: Resize hovered row
+  tr.style.fontSize = "1.2em";
+  tr.style.padding = "1em";
+  tr.style.transition = "all 0.2s ease";
+
+  // ✅ NEW: Shrink all other rows
+  document.querySelectorAll("#sheetTable tbody tr").forEach((row) => {
+    if (row !== tr) {
+      row.style.fontSize = "0.9em";
+      row.style.padding = "0.3em";
+      row.style.transition = "all 0.2s ease";
+    }
+  });
 });
 
 tr.addEventListener("mousemove", (e) => {
@@ -136,8 +152,15 @@ tr.addEventListener("mouseleave", () => {
       }
     }, 200);
   }, 300); // Adjust delay as needed
+
+  // ✅ NEW: Reset all rows' styles
+  document.querySelectorAll("#sheetTable tbody tr").forEach((row) => {
+    row.style.fontSize = "";
+    row.style.padding = "";
+    row.style.transition = "";
+  });
 });
-/*MOUSEOVER IMAGE PREVIEW*/
+/*MOUSEOVER: IMAGE PREVIEW + RESIZE*/
 
 /*GOOGLESHEET: if location - make pill*/
     cells.forEach((cell, index) => {
@@ -459,10 +482,10 @@ function filterByCategories() {
   }
 }
 //filtersystem
-/*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
+/*CATEGORIES: Category funasdasd1
+ction that uses COLUMN I to add categories to rows(items)*/
 
 /*STICKYHEADER: Adjust(?), move to sit right*/
-
 function updateStickyHeaderOffset() {
   const categoryBar = document.getElementById("categoryFilters");
   const tableHeaders = document.querySelectorAll("#sheetTable thead th");
@@ -478,4 +501,4 @@ window.addEventListener("load", updateStickyHeaderOffset);
 window.addEventListener("resize", updateStickyHeaderOffset);
 
 loadCSV();
-//ADJUSTHEADER//
+/*STICKYHEADER: Adjust(?), move to sit right*/
