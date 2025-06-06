@@ -16,7 +16,20 @@ body {
   background-color: #000;
   color: #fff;
   text-align: left;
-  table-layout: fixed;
+  table-layout: auto;
+}
+
+/* give space to last column */
+#sheetTable td:nth-child(4),
+#sheetTable th:nth-child(4) {
+  width: 60px; /* or whatever narrow width you prefer */
+  white-space: nowrap; /* prevents line breaks like '2025' wrapping */
+  text-align: center;   /* optional: center-align year */
+}
+
+#sheetTable td:last-child,
+#sheetTable th:last-child {
+  width: auto;
 }
 
 /* Sticky header row (below pills) */
@@ -35,20 +48,25 @@ body {
   min-width: 100px;
   box-sizing: border-box;
   overflow-wrap: break-word;
+  vertical-align: middle;
+  line-height: 1.2;
 }
 
 #sheetTable tbody tr {
+  height: 3.5em; /* enough for 2 lines of text */
+  overflow: hidden;
   background-color: #000;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  transform-origin: left center;
+  transition: all 0.15s ease;
 }
 
-tbody:hover tr {
-  color: grey; /* dim all rows */
-  transition: color 0.2s;
-}
-
-tbody:hover tr:hover {
-  color: white; /* restore hovered row */
+#sheetTable tbody tr:hover {
+  opacity: 1;
+  font-size: 1.3em;
+  padding: 12px 14px; /* slightly increase padding */
+  background-color: #111; /* or use a highlight color */
+  box-shadow: 0 1px 2px rgba(255,255,255,0.1); /* subtle lift */
 }
 
 .location {
