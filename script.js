@@ -10,6 +10,7 @@ function formatGifURL(pathFromSheet) {
 }
 /*GIF*/
 
+/*GOOGLE SHEET LOADED*/
 async function loadCSV() {
   const response = await fetch("https://docs.google.com/spreadsheets/d/164ps6mI666JLt-q4iVb0FMA5ztPykwRT4mOVAE_zbwE/export?format=csv&gid=11925201");
   const csvText = await response.text();
@@ -21,12 +22,14 @@ async function loadCSV() {
   const headers = rows[0];
   dataRows = rows.slice(1);
   filteredRows = [...dataRows]; // ✅ correct placement
+/*GOOGLE SHEET LOADED*/
 
 // CATEG
 document.getElementById("categoryFilters").classList.add("sticky-category-bar");
 renderCategoryPills(); // ✅ moved down to after dataRows
 // CATEG
 
+/*DONT DISPLAY F ONWARDS OF GOOGLESHEET*/
 thead.innerHTML = ""; // ✅ clear any old headers
 const trHead = document.createElement("tr");
 headers.forEach((header, index) => {
@@ -42,13 +45,9 @@ headers.forEach((header, index) => {
     trHead.appendChild(th);
   });
   thead.appendChild(trHead);
-
+/*DONT DISPLAY F ONWARDS OF GOOGLESHEET*/
   
-  
-  
-  
-  //sort on load
-  
+/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED*/
  // Sort dataRows by year (Column D = index 3), newest to oldest
 dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
 filteredRows = [...dataRows]; // copy sorted
@@ -62,11 +61,10 @@ ths.forEach(th => {
     th.classList.add("sorted", "sorted-desc");
   }
 });
-  
-  //sort on load
-  
+/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED*/
   
   
+ /*!!HOW WILL TABLE(LIST) BE RENDERED!!*/ 
   // Sticky header offset
   updateStickyHeaderOffset();
 
@@ -79,7 +77,9 @@ ths.forEach(th => {
   gridWrapper.classList.add("hidden");
   gridView.innerHTML = "";
 }
-//rendertable
+ /*HOW WILL TABLE(LIST) BE RENDERED*/ 
+
+/*!!TABLE(LIST) IS BEING "RENDERED"!!*/
 function renderTable(rows) {
   const tbody = document.querySelector("#sheetTable tbody");
   tbody.innerHTML = "";
@@ -99,9 +99,10 @@ tr.dataset.previewImage = formattedUrl;
   window.open(url, "_blank", "noopener,noreferrer");
 });
     }
-//render table
+/*!!TABLE(LIST) IS "RENDERED!!*/
 
-    /*-----> MOUSEOVER IMAGE PREVIEW*/
+/*MOUSEOVER STUFF*/
+/*MOUSEOVER IMAGE PREVIEW*/
     tr.addEventListener("mouseenter", () => {
   const preview = document.getElementById("imagePreview");
   const content = document.getElementById("previewContent");
@@ -136,8 +137,9 @@ tr.addEventListener("mouseleave", () => {
     }, 200);
   }, 300); // Adjust delay as needed
 });
-/*-----> MOUSEOVER IMAGE PREVIEW*/
-    
+/*MOUSEOVER IMAGE PREVIEW*/
+
+/*GOOGLESHEET: if location - make pill*/
     cells.forEach((cell, index) => {
       if (index > 4) return; // hide columns F, G, H+
 
@@ -161,7 +163,9 @@ tr.addEventListener("mouseleave", () => {
   });
 
   td.appendChild(link);
+  /*GOOGLESHEET: if location - make pill*/
 
+ /*GOOGLESHEET: On Hover -> show lat/long of location*/
           link.addEventListener("mouseenter", (e) => {
   const preview = document.getElementById("imagePreview");
   const content = document.getElementById("previewContent");
@@ -197,7 +201,9 @@ tr.addEventListener("mouseleave", () => {
 
   e.stopPropagation();
 });
-
+/*GOOGLESHEET: On Hover -> show lat/long of location*/
+ 
+/*not entirely sure -> is this still part of the image preview of row??*/
           link.addEventListener("mousemove", (e) => {
             const preview = document.getElementById("imagePreview");
             preview.style.left = `${e.pageX + 20}px`;
@@ -231,8 +237,9 @@ tr.addEventListener("mouseleave", () => {
     tbody.appendChild(tr);
   });
 }
+/*not entirely sure -> is this still part of the image preview of row??*/
 
-//render grid
+/*!!RENDER GRID -> can i move this up to where it renders the table? makes sense to categorically*/
     function renderGridView(rows) {
   const grid = document.getElementById("gridView");
   grid.innerHTML = "";
@@ -261,9 +268,9 @@ tr.addEventListener("mouseleave", () => {
     grid.appendChild(card);
   });
 }
-    //render grid
+/*!!RENDER GRID -> can i move this up to where it renders the table? makes sense to categorically*/
 
-/*------>CLICK ON Column to Sort*/
+/*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
 function sortByColumn(index) {
   const ths = document.querySelectorAll("thead th");
 
@@ -303,14 +310,13 @@ function sortByColumn(index) {
 
   renderTable(sorted);
 }
-/*------>CLICK ON Column to Sort*/
+/*FUNCTION:------>CLICK ON Column to Sort*/
 let selectedCategories = [];
 
-//categories
+//categories(?)
+/*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
 
-
-//TOGGLEVIEW
-
+/*TOGGLE BETWEEN TABLE(LIST)/GRID: Can I move this under SORT ITEMS(...) when that has moved up?*/
 const toggleBtn = document.getElementById("toggleView");
 
 toggleBtn.addEventListener("click", () => {
@@ -342,11 +348,10 @@ toggleBtn.addEventListener("click", () => {
     toggleBtn.textContent = "VIEW: ≡";
   }
 });
-
-//TOGGLEVIEW
-
+/*TOGGLE BETWEEN TABLE(LIST)/GRID: Can I move this under SORT ITEMS(...) when that has moved up?*/
 
 
+/*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
 function renderCategoryPills() {
   const container = document.getElementById("categoryFilters");
   if (!container) return;
@@ -454,8 +459,9 @@ function filterByCategories() {
   }
 }
 //filtersystem
+/*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
 
-//ADJUST HEADER//
+/*STICKYHEADER: Adjust(?), move to sit right*/
 
 function updateStickyHeaderOffset() {
   const categoryBar = document.getElementById("categoryFilters");

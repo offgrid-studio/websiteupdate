@@ -19,6 +19,16 @@ body {
   table-layout: fixed;
 }
 
+/* Sticky header row (below pills) */
+#sheetTable li {
+  transition: transform 0.15s ease;
+  transform-origin: center center;
+}
+
+#sheetTable li:hover {
+  transform: scale(1.2);
+}
+
 #sheetTable td {
   padding: 10px 14px;
   border-bottom: 0.5px solid #eee;
