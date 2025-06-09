@@ -2,13 +2,22 @@ let currentSort = { column: null, direction: 'asc' };
 let dataRows = [];
 let filteredRows = []; // stores the currently filtered data
 
-/*GIF*/
+/*GIF formats Column filename to full URL ---> where does it define the column?*/
 function formatGifURL(pathFromSheet) {
   if (!pathFromSheet || typeof pathFromSheet !== "string") return null;
   const relativePath = pathFromSheet.replace(/^\/?public_html/, '');
   return "https://offgrid.studio" + relativePath;
 }
 /*GIF*/
+
+/*AUDIO formats Column filename to full URL ---> where does it define the column?*/
+function formatAudioURL(filename) {
+  if (!filename || typeof filename !== "string") return null;
+  // Ensure it points to /AUDIO/ even if full or partial path
+  const clean = filename.replace(/^\/?public_html\/?/, '');
+  return "https://offgrid.studio/public_html/AUDIO/" + clean.replace(/^AUDIO\/?/, '');
+}
+/*AUDIO formats Column filename to full URL ---> where does it define the column?*/
 
 /*GOOGLE SHEET LOADED*/
 async function loadCSV() {
