@@ -99,6 +99,11 @@ tr.dataset.previewImage = formattedUrl;
   window.open(url, "_blank", "noopener,noreferrer");
 });
     }
+/*!!PILLZOOMSTUFF!!*/
+const tags = (cells[8] || "").split(";").map(t => t.trim());
+    tr.dataset.tags = JSON.stringify(tags);
+    tr.addEventListener("mouseenter", () => highlightPills(tags));
+    tr.addEventListener("mouseleave", resetPills);
 /*!!TABLE(LIST) IS "RENDERED!!*/
 
 /*MOUSEOVER STUFF*/
@@ -250,9 +255,14 @@ tr.addEventListener("mouseleave", () => {
     const year = cells[3];
     const link = cells[5];
 
+    const tags = (cells[8] || "").split(";").map(t => t.trim());
+
     const card = document.createElement("div");
-    card.className = "grid-card animated"; // Add animated class
-    card.style.animationDelay = `${i * 40}ms`; // Stagger animation
+    card.className = "grid-card animated";
+    card.style.animationDelay = `${i * 40}ms`;
+    card.dataset.tags = JSON.stringify(tags);
+    card.addEventListener("mouseenter", () => highlightPills(tags));
+    card.addEventListener("mouseleave", resetPills);
 
     card.innerHTML = `
       <img src="${gifUrl}" alt="${projectTitle}">
@@ -268,6 +278,33 @@ tr.addEventListener("mouseleave", () => {
     grid.appendChild(card);
   });
 }
+/*!!HIGHLIGHTPILLSTUFF!!*/
+function highlightPills(tags) {
+  const pills = document.querySelectorAll(".pill");
+  pills.forEach(pill => {
+    const category = pill.getAttribute("data-category");
+    if (tags.includes(category)) {
+      pill.style.transform = "scale(1.5)";
+      pill.style.margin = "0 12px";
+      pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
+    } else {
+      pill.style.transform = "scale(1)";
+      pill.style.margin = "0 6px";
+    }
+  });
+}
+
+function resetPills() {
+  const pills = document.querySelectorAll(".pill");
+  pills.forEach(pill => {
+    pill.style.transform = "scale(1)";
+    pill.style.margin = "0 8px";
+    pill.style.transition = "transform 0.2s ease, margin 0.2s ease"; // 🆕 Add this line
+  });
+}
+
+loadCSV();
+/*!!HIGHLIGHTPILLSTUFF!!*/
 /*!!RENDER GRID!!*/
 
 /*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
@@ -372,8 +409,9 @@ function renderCategoryPills() {
   // Create pill elements
   [...allCategories].sort().forEach(cat => {
     const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = cat;
+pill.className = "pill";
+pill.textContent = cat;
+pill.setAttribute("data-category", cat); // ✅ Allows pill to be matched on hover
     pill.style.margin = "4px";
     pill.style.padding = "6px 10px";
 pill.style.minWidth = "80px"; // Add this to prevent size shifting

@@ -116,13 +116,34 @@ display: none;
   opacity: 0; 
 }
 
+/* PILLS💊 */
 #categoryFilters {
   position: sticky;
   bottom: 0;
   background-color: #000;
   z-index: 1;
   padding: 10px;
+
+  /* 🔧 Add these lines for flexible pill layout */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
+
+.pill {
+  transition: transform 0.2s ease, margin 0.2s ease, opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  background-color: black;
+  color: white;
+}
+
 
 /* Sticky category pills bar */
 #categoryFilters.sticky-category-bar {
