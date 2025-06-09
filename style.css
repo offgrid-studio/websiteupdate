@@ -105,7 +105,6 @@ th.sorted-desc::after {
 #imagePreview{
 display: none;
   position: absolute;
-  pointer-events: none;
   font-family: Helvetica, sans-serif;
   font-size: 11pt;
   background: none;
@@ -150,45 +149,51 @@ display: none;
   display: none;
 }
 
+/* 🗳️GRID GRID GRID GRID*/
 #gridView {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Keeps grid responsive */
   gap: 20px;
   padding: 40px;
 }
 
 .grid-card {
-  cursor: pointer;
-  text-align: center;
-  opacity: 0;
-  transform: translateY(10px);
+  position: relative;
+  transform: scale(1);
+  transition: transform 0.2s ease;
+  z-index: 1;
+  overflow: hidden;
 }
-
-/* Trigger animation when grid is shown */
-.grid-card.animated {
-  animation: fadeUp 0.4s ease forwards;
-}
-
 
 .grid-card img {
   width: 100%;
+  height: auto;
+  display: block;
   border-radius: 12px;
-  border: none;
+  transition: transform 0.25s ease;
+  object-fit: cover;
 }
 
 .grid-card .meta {
   font-size: 12px;
-  color: #666;
+  color: #aaa;
   margin-top: 8px;
+  transition: transform 0.5s ease;
 }
 
-@keyframes fadeUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* On hover: scale entire card, including image and text */
+.grid-card:hover {
+  transform: scale(1.4);
+  z-index: 10;
 }
 
+/* All others shrink slightly */
+#gridView:hover .grid-card:not(:hover) {
+  transform: scale(0.95);
+  z-index: 1;
+}
+
+/*CLEAR BUTTON FOR CATEGORY LOGIC*/
 .clear-all-btn {
   width: 28px;
   height: 28px;
@@ -227,7 +232,6 @@ display: none;
 #gridWrapper.hidden {
   opacity: 0;
   transform: translateY(20px);
-  pointer-events: none;
 }
 
 #sheetTable.animated {

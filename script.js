@@ -239,7 +239,7 @@ tr.addEventListener("mouseleave", () => {
 }
 /*not entirely sure -> is this still part of the image preview of row??*/
 
-/*!!RENDER GRID -> can i move this up to where it renders the table? makes sense to categorically*/
+/*!!RENDER GRID!!*/
     function renderGridView(rows) {
   const grid = document.getElementById("gridView");
   grid.innerHTML = "";
@@ -268,7 +268,7 @@ tr.addEventListener("mouseleave", () => {
     grid.appendChild(card);
   });
 }
-/*!!RENDER GRID -> can i move this up to where it renders the table? makes sense to categorically*/
+/*!!RENDER GRID!!*/
 
 /*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
 function sortByColumn(index) {
