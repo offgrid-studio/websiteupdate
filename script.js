@@ -1,3 +1,11 @@
+// Start Tone.js after first user gesture
+document.addEventListener("click", async () => {
+  if (Tone.context.state !== "running") {
+    await Tone.start();
+    console.log("🔊 Tone.js context started");
+  }
+}, { once: true }); // only run once
+
 let currentSort = { column: null, direction: 'asc' };
 let dataRows = [];
 let filteredRows = []; // stores the currently filtered data
@@ -17,6 +25,9 @@ function formatAudioURL(filename) {
   return "https://files.offgrid.studio/" + filename.trim();
 }
 /*AUDIO formats Column filename to full URL ---> where does it define the column?*/
+
+//AUDIO TEST
+//AUDIO TEST
 
 /*GOOGLE SHEET LOADED*/
 async function loadCSV() {
@@ -268,6 +279,7 @@ tr.addEventListener("mouseleave", () => {
     const tags = (cells[8] || "").split(";").map(t => t.trim());
 
     const card = document.createElement("div");
+
     card.className = "grid-card animated";
     card.style.animationDelay = `${i * 40}ms`;
     card.dataset.tags = JSON.stringify(tags);
