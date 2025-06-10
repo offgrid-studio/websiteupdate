@@ -10,12 +10,11 @@ function formatGifURL(pathFromSheet) {
 }
 /*GIF*/
 
-/*AUDIO formats Column filename to full URL ---> where does it define the column?*/
+/*AUDIO
+ formats Column filename to full URL ---> where does it define the column?*/
 function formatAudioURL(filename) {
   if (!filename || typeof filename !== "string") return null;
-  // Ensure it points to /AUDIO/ even if full or partial path
-  const clean = filename.replace(/^\/?public_html\/?/, '');
-  return "https://offgrid.studio/public_html/AUDIO/" + clean.replace(/^AUDIO\/?/, '');
+  return "https://files.offgrid.studio/" + filename.trim();
 }
 /*AUDIO formats Column filename to full URL ---> where does it define the column?*/
 
@@ -217,14 +216,14 @@ tr.addEventListener("mouseleave", () => {
 });
 /*GOOGLESHEET: On Hover -> show lat/long of location*/
  
-/*not entirely sure -> is this still part of the image preview of row??*/
-          link.addEventListener("mousemove", (e) => {
+/*GIF PREVIEW ON HOVER*/
+          link.addEventListener("mousemove", (e) => {//GIF PREVIEW FOLLOWS MOUSE MOVEMENT
             const preview = document.getElementById("imagePreview");
             preview.style.left = `${e.pageX + 20}px`;
             preview.style.top = `${e.pageY - 20}px`;
           });
 
-          link.addEventListener("mouseleave", (e) => {
+          link.addEventListener("mouseleave", (e) => { //GIF PREVIEW STOPS
             const preview = document.getElementById("imagePreview");
             const content = document.getElementById("previewContent");
             const tr = e.currentTarget.closest("tr");
@@ -251,7 +250,8 @@ tr.addEventListener("mouseleave", () => {
     tbody.appendChild(tr);
   });
 }
-/*not entirely sure -> is this still part of the image preview of row??*/
+/*GIF PREVIEW ON HOVER*/
+
 
 /*!!RENDER GRID!!*/
     function renderGridView(rows) {
@@ -259,6 +259,7 @@ tr.addEventListener("mouseleave", () => {
   grid.innerHTML = "";
 
   rows.forEach((cells, i) => {
+
     const gifUrl = formatGifURL(cells[6]);
     const projectTitle = cells[0];
     const year = cells[3];
@@ -509,7 +510,6 @@ function filterByCategories() {
 /*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
 
 /*STICKYHEADER: Adjust(?), move to sit right*/
-
 function updateStickyHeaderOffset() {
   const categoryBar = document.getElementById("categoryFilters");
   const tableHeaders = document.querySelectorAll("#sheetTable thead th");
@@ -523,6 +523,19 @@ function updateStickyHeaderOffset() {
 }
 window.addEventListener("load", updateStickyHeaderOffset);
 window.addEventListener("resize", updateStickyHeaderOffset);
+/*STICKYHEADER: Adjust(?), move to sit right*/
 
-loadCSV();
-//ADJUSTHEADER//
+
+/*AUDIO BUTTON TEST*/
+document.getElementById("toneTestBtn").addEventListener("click", async () => {
+  await Tone.start();
+  console.log("🔊 Tone.js started");
+
+  const player = new Tone.Player("http://files.offgrid.studio/22CC_SYNSYMESH2_CLICK.mp3").toDestination();
+  player.autostart = true;
+});
+/*AUDIO BUTTON TEST*/
+
+//LOAD SHEET
+    loadCSV();
+ 
