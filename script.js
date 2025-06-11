@@ -159,17 +159,19 @@ const tags = (cells[8] || "").split(";").map(t => t.trim());
 /*!!TABLE(LIST) IS "RENDERED!!*/
 
 /*MOUSEOVER STUFF*/
+
 /*MOUSEOVER IMAGE PREVIEW*/
-    tr.addEventListener("mouseenter", () => {
+tr.addEventListener("mouseenter", () => {
   const preview = document.getElementById("imagePreview");
   const content = document.getElementById("previewContent");
-  content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
-  preview.style.display = "block";
-  requestAnimationFrame(() => {
-    preview.style.opacity = "1";
-  });
 
-  // Cancel any hide timers
+  content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
+
+  // Reset the animation even if it was already active
+  preview.classList.remove("active");
+  void preview.offsetWidth; // Force reflow to reset animation
+  preview.classList.add("active");
+
   clearTimeout(preview.hideTimer);
 });
 
@@ -179,20 +181,17 @@ tr.addEventListener("mousemove", (e) => {
   preview.style.top = `${e.pageY - 20}px`;
 });
 
-tr.addEventListener("mouseleave", () => {
+tr.addEventListener("mouseleave", (e) => {
   const preview = document.getElementById("imagePreview");
   const content = document.getElementById("previewContent");
 
-  // Delay hiding to allow time to hover over the preview box or nearby row
+  // Remove the preview immediately or after a short delay
   preview.hideTimer = setTimeout(() => {
-    preview.style.opacity = "0";
+    preview.classList.remove("active");
     setTimeout(() => {
-      if (!preview.matches(":hover")) {
-        preview.style.display = "none";
-        content.innerHTML = "";
-      }
-    }, 200);
-  }, 300); // Adjust delay as needed
+      content.innerHTML = "";
+    }, 500); // match CSS transition time
+  }, 50); // small delay to prevent flicker
 });
 /*MOUSEOVER IMAGE PREVIEW*/
 
@@ -298,7 +297,7 @@ tr.addEventListener("mouseleave", () => {
 
 
 /*Audio Envelope*/
-function playShapedAudio(player) {
+async function playShapedAudio(player) {
   if (!player || !player.buffer.loaded) {
     console.warn("⚠️ Player not loaded");
     return;
@@ -312,7 +311,6 @@ function playShapedAudio(player) {
 
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
-  // Envelope + Filter params
   const attack = randomBetween(0.01, 0.3);
   const release = randomBetween(0.1, 0.5);
   const cutoff = randomBetween(500, 10000);
@@ -321,7 +319,6 @@ function playShapedAudio(player) {
   console.log(`🎛️ Attack: ${attack}s | Release: ${release}s`);
   console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
 
-  // Filter and Gain
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
   const gainNode = new Tone.Gain(0);
 
@@ -330,24 +327,27 @@ function playShapedAudio(player) {
   let fx;
 
   if (useReverb) {
-    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
-    reverb.wet.value = 0.3;
-    reverb.generate();
-    fx = reverb.toDestination();
-    gainNode.connect(fx);
-  } else {
-    const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.3 });
-    delay.wet.value = 0.3;
-    fx = delay.toDestination();
-    gainNode.connect(fx);
-  }
+  console.log("🌀 Using reverb");
 
-  // Reconnect player routing
+  const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
+  reverb.wet.value = 0.3;
+  await reverb.generate(); // required for correct routing
+  fx = reverb;
+} else {
+  console.log("🔁 Using delay");
+
+  const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.5 });
+  delay.wet.value = 0.3;
+  fx = delay;
+}
+
+  gainNode.connect(fx);
+  fx.toDestination();
+
   player.disconnect();
   player.connect(filter);
   filter.connect(gainNode);
 
-  // Apply volume envelope
   gainNode.gain.setValueAtTime(0, now);
   gainNode.gain.linearRampToValueAtTime(1, now + attack);
   gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);

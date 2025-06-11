@@ -39,7 +39,7 @@ body {
 }
 
 #sheetTable li:hover {
-  transform: scale(1.2);
+  transform: scale(1);
 }
 
 #sheetTable td {
@@ -58,13 +58,13 @@ body {
   background-color: #000;
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   transform-origin: left center;
-  transition: all 0.15s ease;
+  transition: all 0.3s ease;
 }
 
 #sheetTable tbody tr:hover {
   opacity: 1;
-  font-size: 1.3em;
-  padding: 12px 14px; /* slightly increase padding */
+  font-size: 1.4em;
+  padding: 14px 14px; /* slightly increase padding */
   background-color: #111; /* or use a highlight color */
   box-shadow: 0 1px 2px rgba(255,255,255,0.1); /* subtle lift */
 }
@@ -102,19 +102,33 @@ th.sorted-desc::after {
   transform: rotate(180deg); /* ▼ */
 }
 
-#imagePreview{
-display: none;
+#imagePreview {
+  opacity: 1;
+  visibility: hidden;
+  transform: scale(0.5);
+  transition: opacity 0.4s ease, transform 40ms ease-out;
+  pointer-events: none;
   position: absolute;
-  font-family: Helvetica, sans-serif;
-  font-size: 11pt;
-  background: none;
-  color: white;
-  padding: 6px 10px;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transition: opacity 0.3s ease;
-  opacity: 0; 
+  z-index: 999;
 }
+
+#imagePreview.active {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1.25);
+}
+
+#imagePreview img {
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.5s ease, transform 60ms ease-out;
+}
+
+#imagePreview.active img {
+  opacity: 1;
+  transform: scale(1.25);
+}
+
 
 /* PILLS💊 */
 #categoryFilters {
@@ -180,8 +194,8 @@ display: none;
 
 .grid-card {
   position: relative;
-  transform: scale(1);
-  transition: transform 0.2s ease;
+  transform: scale(1.2);
+  transition: transform 0.25s ease;
   z-index: 1;
   overflow: hidden;
 }
@@ -191,7 +205,7 @@ display: none;
   height: auto;
   display: block;
   border-radius: 12px;
-  transition: transform 0.25s ease;
+  transition: transform 0.35s ease;
   object-fit: cover;
 }
 
@@ -210,7 +224,7 @@ display: none;
 
 /* All others shrink slightly */
 #gridView:hover .grid-card:not(:hover) {
-  transform: scale(0.95);
+  transform: scale(0.9);
   z-index: 1;
 }
 
