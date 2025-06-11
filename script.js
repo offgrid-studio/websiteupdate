@@ -1,3 +1,5 @@
+const audioPlayers = {}; // { uniqueKey: { hover: Tone.Player, click: Tone.Player } }
+
 let currentPlayer = null;
 
 // Start Tone.js after first user gesture
@@ -39,8 +41,34 @@ async function loadCSV() {
 
   const headers = rows[0];
   dataRows = rows.slice(1);
+
+  await preloadAudioPlayers(dataRows);
+
+
   filteredRows = [...dataRows]; // ✅ correct placement
 /*GOOGLE SHEET LOADED*/
+
+/*Audio: preload Audio Player*/
+async function preloadAudioPlayers(rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const hoverUrl = formatAudioURL(row[15]); // Column P
+    const clickUrl = formatAudioURL(row[17]); // Column R
+    const key = `row${i}`;
+
+    const hoverPlayer = hoverUrl ? new Tone.Player({ url: hoverUrl, autostart: false }).toDestination() : null;
+    const clickPlayer = clickUrl ? new Tone.Player({ url: clickUrl, autostart: false }).toDestination() : null;
+
+    audioPlayers[key] = { hover: hoverPlayer, click: clickPlayer };
+
+    // Wait a moment to avoid flooding requests
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  console.log("✅ All audio preloaded");
+}
+/*Audio: preload Audio Player*/
+
 
 // CATEG
 document.getElementById("categoryFilters").classList.add("sticky-category-bar");
@@ -102,7 +130,7 @@ function renderTable(rows) {
   const tbody = document.querySelector("#sheetTable tbody");
   tbody.innerHTML = "";
 
-  rows.forEach(cells => {
+  rows.forEach((cells, i) => {
     const tr = document.createElement("tr");
     const rawGifPath = cells[6];
 const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
@@ -111,7 +139,7 @@ tr.dataset.previewImage = formattedUrl;
 /*Audio: P R in TABLE*/
 const hoverUrl = formatAudioURL(cells[15]); // Column P
 const clickUrl = formatAudioURL(cells[17]); // Column R
-attachHoverAndClickAudio(tr, hoverUrl, clickUrl);
+attachHoverAndClickAudio(tr, `row${i}`);
 /*Audio: P R in TABLE*/
 
     const url = cells[5];
@@ -270,83 +298,75 @@ tr.addEventListener("mouseleave", () => {
 
 
 /*Audio Envelope*/
-function playShapedAudio(url) {
-  if (!url) {
-    console.warn("⚠️ No audio URL provided");
+function playShapedAudio(player) {
+  if (!player || !player.buffer.loaded) {
+    console.warn("⚠️ Player not loaded");
     return;
   }
 
+  // Stop previous playback
   if (currentPlayer) {
     currentPlayer.stop();
-    currentPlayer.dispose();
+    currentPlayer.disconnect(); // fully disconnect routing
   }
 
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
-  const attack = randomBetween(0.01, 0.3); // seconds
-  const release = randomBetween(0.1, 0.5); // seconds
+  // Envelope + Filter params
+  const attack = randomBetween(0.01, 0.3);
+  const release = randomBetween(0.1, 0.5);
   const cutoff = randomBetween(500, 10000);
+  const now = Tone.now();
 
-  console.log("🔊 Playing:", url);
   console.log(`🎛️ Attack: ${attack}s | Release: ${release}s`);
   console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
 
+  // Filter and Gain
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
+  const gainNode = new Tone.Gain(0);
 
-  // Gain node we'll fade in/out
-  const gainNode = new Tone.Gain(0).toDestination();
-
-  // Random FX
+  // Choose FX path randomly
   const useReverb = Math.random() < 0.5;
   let fx;
 
   if (useReverb) {
-    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 }).toDestination();
+    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
     reverb.wet.value = 0.3;
-    fx = reverb;
+    reverb.generate();
+    fx = reverb.toDestination();
     gainNode.connect(fx);
   } else {
-    const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.3 }).toDestination();
+    const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.3 });
     delay.wet.value = 0.3;
-    fx = delay;
+    fx = delay.toDestination();
     gainNode.connect(fx);
   }
 
-  const player = new Tone.Player({
-    url,
-    autostart: false,
-    onload: () => {
-      const now = Tone.now();
-
-      // Fade in/out
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(1, now + attack);
-      gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);
-
-      player.start(now);
-    },
-    onerror: err => console.error("❌ Load error:", err)
-  });
-
+  // Reconnect player routing
+  player.disconnect();
   player.connect(filter);
   filter.connect(gainNode);
 
+  // Apply volume envelope
+  gainNode.gain.setValueAtTime(0, now);
+  gainNode.gain.linearRampToValueAtTime(1, now + attack);
+  gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);
+
+  player.start(now);
   currentPlayer = player;
 }
 /*Audio Envelope*/
 
 /*Audio MouseOver + Click*/
-function attachHoverAndClickAudio(el, hoverUrl, clickUrl) {
-  el.addEventListener("mouseenter", async () => {
-    await Tone.start();
-    console.log("🎧 Hover triggered:", hoverUrl);
-    if (hoverUrl) playShapedAudio(hoverUrl);
+function attachHoverAndClickAudio(el, rowKey) {
+  el.addEventListener("mouseenter", () => {
+    const player = audioPlayers[rowKey]?.hover;
+    if (player) playShapedAudio(player);
   });
 
-  el.addEventListener("click", async () => {
-    await Tone.start();
-    console.log("🎧 Click triggered:", clickUrl);
-    if (clickUrl) playShapedAudio(clickUrl);
+  el.addEventListener("click", () => {
+    const player = audioPlayers[rowKey]?.click;
+    if (player) playShapedAudio(player);
   });
 }
 /*Audio MouseOver + Click*/
@@ -386,7 +406,7 @@ function attachHoverAndClickAudio(el, hoverUrl, clickUrl) {
          /*Audio: P R in GRID*/
     const hoverUrl = formatAudioURL(cells[15]); // Column P
     const clickUrl = formatAudioURL(cells[17]); // Column R
-    attachHoverAndClickAudio(card, hoverUrl, clickUrl);
+    attachHoverAndClickAudio(card, `row${i}`);
     /*Audio: P R in GRID*/
 
     grid.appendChild(card);
