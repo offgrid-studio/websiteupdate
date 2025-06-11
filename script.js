@@ -269,35 +269,58 @@ tr.addEventListener("mouseleave", () => {
 
 /*Audio Envelope*/
 function playShapedAudio(url) {
-  if (!url) return;
+  if (!url) {
+    console.warn("⚠️ No audio URL provided");
+    return;
+  }
+
+  // Random helper
+  const randomBetween = (min, max) => Math.random() * (max - min) + min;
+
+  // Randomized envelope values
+  const attack = randomBetween(0.01, 0.1); // 10ms–100ms
+  const decay = randomBetween(0.05, 0.1);    // 50ms–100ms
+  const sustain = randomBetween(0.5, 1.0);   // 50%–100%
+  const release = randomBetween(0.025, 1); // 50ms–1000ms
+
+  // Randomized filter cutoff
+  const cutoff = randomBetween(500, 9000); // 5kHz–17kHz
+
+  // Log values
+  console.log("🔊 Playing:", url);
+  console.log(`🎛️ Envelope - Attack: ${attack.toFixed(3)}s, Decay: ${decay.toFixed(3)}s, Sustain: ${sustain.toFixed(2)}, Release: ${release.toFixed(3)}s`);
+  console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
 
   // Envelope
   const ampEnv = new Tone.AmplitudeEnvelope({
-    attack: 0.05,
-    decay: 0.05,
-    sustain: 0.5,
-    release: 0.1
+    attack,
+    decay,
+    sustain,
+    release
   });
 
   // Filter
   const filter = new Tone.Filter({
     type: "lowpass",
-    frequency: 1000,
+    frequency: cutoff,
     rolloff: -12
   });
 
   // Player
   const player = new Tone.Player({
-    url: url,
+    url,
     autostart: false,
     onload: () => {
-      // Now that it's loaded, trigger envelope and start playback
+      console.log("✅ Audio loaded, duration:", player.buffer.duration.toFixed(2), "seconds");
       ampEnv.triggerAttackRelease(player.buffer.duration);
       player.start();
+    },
+    onerror: (err) => {
+      console.error("❌ Error loading audio:", err);
     }
   });
 
-  // Connect chain
+  // Chain: player → filter → amp envelope → speakers
   player.connect(filter);
   filter.connect(ampEnv);
   ampEnv.toDestination();
