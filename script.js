@@ -1,3 +1,5 @@
+let currentPlayer = null;
+
 // Start Tone.js after first user gesture
 document.addEventListener("click", async () => {
   if (Tone.context.state !== "running") {
@@ -274,56 +276,62 @@ function playShapedAudio(url) {
     return;
   }
 
-  // Random helper
+  if (currentPlayer) {
+    currentPlayer.stop();
+    currentPlayer.dispose();
+  }
+
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
-  // Randomized envelope values
-  const attack = randomBetween(0.01, 0.1); // 10ms–100ms
-  const decay = randomBetween(0.05, 0.1);    // 50ms–100ms
-  const sustain = randomBetween(0.5, 1.0);   // 50%–100%
-  const release = randomBetween(0.025, 1); // 50ms–1000ms
+  const attack = randomBetween(0.01, 0.3); // seconds
+  const release = randomBetween(0.1, 0.5); // seconds
+  const cutoff = randomBetween(500, 10000);
 
-  // Randomized filter cutoff
-  const cutoff = randomBetween(500, 9000); // 5kHz–17kHz
-
-  // Log values
   console.log("🔊 Playing:", url);
-  console.log(`🎛️ Envelope - Attack: ${attack.toFixed(3)}s, Decay: ${decay.toFixed(3)}s, Sustain: ${sustain.toFixed(2)}, Release: ${release.toFixed(3)}s`);
+  console.log(`🎛️ Attack: ${attack}s | Release: ${release}s`);
   console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
 
-  // Envelope
-  const ampEnv = new Tone.AmplitudeEnvelope({
-    attack,
-    decay,
-    sustain,
-    release
-  });
+  const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
 
-  // Filter
-  const filter = new Tone.Filter({
-    type: "lowpass",
-    frequency: cutoff,
-    rolloff: -12
-  });
+  // Gain node we'll fade in/out
+  const gainNode = new Tone.Gain(0).toDestination();
 
-  // Player
+  // Random FX
+  const useReverb = Math.random() < 0.5;
+  let fx;
+
+  if (useReverb) {
+    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 }).toDestination();
+    reverb.wet.value = 0.3;
+    fx = reverb;
+    gainNode.connect(fx);
+  } else {
+    const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.3 }).toDestination();
+    delay.wet.value = 0.3;
+    fx = delay;
+    gainNode.connect(fx);
+  }
+
   const player = new Tone.Player({
     url,
     autostart: false,
     onload: () => {
-      console.log("✅ Audio loaded, duration:", player.buffer.duration.toFixed(2), "seconds");
-      ampEnv.triggerAttackRelease(player.buffer.duration);
-      player.start();
+      const now = Tone.now();
+
+      // Fade in/out
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(1, now + attack);
+      gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);
+
+      player.start(now);
     },
-    onerror: (err) => {
-      console.error("❌ Error loading audio:", err);
-    }
+    onerror: err => console.error("❌ Load error:", err)
   });
 
-  // Chain: player → filter → amp envelope → speakers
   player.connect(filter);
-  filter.connect(ampEnv);
-  ampEnv.toDestination();
+  filter.connect(gainNode);
+
+  currentPlayer = player;
 }
 /*Audio Envelope*/
 
