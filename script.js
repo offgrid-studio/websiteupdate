@@ -24,10 +24,7 @@ function formatAudioURL(filename) {
   if (!filename || typeof filename !== "string") return null;
   return "https://files.offgrid.studio/" + filename.trim();
 }
-/*AUDIO formats Column filename to full URL ---> where does it define the column?*/
-
-//AUDIO TEST
-//AUDIO TEST
+/*AUDIO formats Column filename to full URL ---> where does it define the column?*
 
 /*GOOGLE SHEET LOADED*/
 async function loadCSV() {
@@ -108,6 +105,12 @@ function renderTable(rows) {
     const rawGifPath = cells[6];
 const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
 tr.dataset.previewImage = formattedUrl;
+
+/*Audio: P R in TABLE*/
+const hoverUrl = formatAudioURL(cells[15]); // Column P
+const clickUrl = formatAudioURL(cells[17]); // Column R
+attachHoverAndClickAudio(tr, hoverUrl, clickUrl);
+/*Audio: P R in TABLE*/
 
     const url = cells[5];
     if (url) {
@@ -264,6 +267,59 @@ tr.addEventListener("mouseleave", () => {
 /*GIF PREVIEW ON HOVER*/
 
 
+/*Audio Envelope*/
+function playShapedAudio(url) {
+  if (!url) return;
+
+  // Envelope
+  const ampEnv = new Tone.AmplitudeEnvelope({
+    attack: 0.05,
+    decay: 0.05,
+    sustain: 0.5,
+    release: 0.1
+  });
+
+  // Filter
+  const filter = new Tone.Filter({
+    type: "lowpass",
+    frequency: 1000,
+    rolloff: -12
+  });
+
+  // Player
+  const player = new Tone.Player({
+    url: url,
+    autostart: false,
+    onload: () => {
+      // Now that it's loaded, trigger envelope and start playback
+      ampEnv.triggerAttackRelease(player.buffer.duration);
+      player.start();
+    }
+  });
+
+  // Connect chain
+  player.connect(filter);
+  filter.connect(ampEnv);
+  ampEnv.toDestination();
+}
+/*Audio Envelope*/
+
+/*Audio MouseOver + Click*/
+function attachHoverAndClickAudio(el, hoverUrl, clickUrl) {
+  el.addEventListener("mouseenter", async () => {
+    await Tone.start();
+    console.log("🎧 Hover triggered:", hoverUrl);
+    if (hoverUrl) playShapedAudio(hoverUrl);
+  });
+
+  el.addEventListener("click", async () => {
+    await Tone.start();
+    console.log("🎧 Click triggered:", clickUrl);
+    if (clickUrl) playShapedAudio(clickUrl);
+  });
+}
+/*Audio MouseOver + Click*/
+
 /*!!RENDER GRID!!*/
     function renderGridView(rows) {
   const grid = document.getElementById("gridView");
@@ -278,7 +334,7 @@ tr.addEventListener("mouseleave", () => {
 
     const tags = (cells[8] || "").split(";").map(t => t.trim());
 
-    const card = document.createElement("div");
+    const card = document.createElement("div"); 
 
     card.className = "grid-card animated";
     card.style.animationDelay = `${i * 40}ms`;
@@ -296,6 +352,11 @@ tr.addEventListener("mouseleave", () => {
         window.open(link, "_blank", "noopener,noreferrer");
       });
     }
+         /*Audio: P R in GRID*/
+    const hoverUrl = formatAudioURL(cells[15]); // Column P
+    const clickUrl = formatAudioURL(cells[17]); // Column R
+    attachHoverAndClickAudio(card, hoverUrl, clickUrl);
+    /*Audio: P R in GRID*/
 
     grid.appendChild(card);
   });
@@ -543,7 +604,10 @@ document.getElementById("toneTestBtn").addEventListener("click", async () => {
   await Tone.start();
   console.log("🔊 Tone.js started");
 
-  const player = new Tone.Player("http://files.offgrid.studio/22CC_SYNSYMESH2_CLICK.mp3").toDestination();
+  const rawFilename = "22CC_SYNSYMESH2_CLICK.mp3"; // ← filename only
+  const url = formatAudioURL(rawFilename); // ← uses your formatter
+
+  const player = new Tone.Player(url).toDestination();
   player.autostart = true;
 });
 /*AUDIO BUTTON TEST*/
