@@ -73,7 +73,7 @@ async function loadCSV() {
 
   // === 🗂 Sort by year (Column D = index 3), newest to oldest ===
   dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
-  filteredRows = [...dataRows]; // copy sorted data
+  filteredRows = dataRows.map((row, i) => ({ row, index: i })); // copy sorted data
 
   // Set visual indicator on sorted column
   const ths = document.querySelectorAll("thead th");
@@ -127,21 +127,6 @@ async function preloadAudioPlayers(rows) {
 document.getElementById("categoryFilters").classList.add("sticky-category-bar");
 renderCategoryPills(); // ✅ moved down to after dataRows
 // CATEG
-
-headers.forEach((header, index) => {
-    if (index > 4) return; // skip columns F and beyond
-    const th = document.createElement("th");
-    th.dataset.index = index;
-    th.innerText = header;
-
-    if (index !== 4) {
-      th.addEventListener("click", () => sortByColumn(index));
-    }
-
-    trHead.appendChild(th);
-  });
-  thead.appendChild(trHead);
-/*DONT DISPLAY F ONWARDS OF GOOGLESHEET*/
   
 /*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED*/
  // Sort dataRows by year (Column D = index 3), newest to oldest
@@ -175,16 +160,17 @@ ths.forEach(th => {
  /*HOW WILL TABLE(LIST) BE RENDERED*/ 
 
 /*!!TABLE(LIST) IS BEING "RENDERED"!!*/
-function renderTable(rows) {
+function renderTable(rowsWithIndex) {
   const tbody = document.querySelector("#sheetTable tbody");
   tbody.innerHTML = "";
 
-  rows.forEach((cells, i) => {
+  rowsWithIndex.forEach(({ row: cells, index: i }) => {
     const tr = document.createElement("tr");
     const rawGifPath = cells[6];
-const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
-tr.dataset.previewImage = formattedUrl;
-/*Audio: P R in TABLE*/
+    const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
+    tr.dataset.previewImage = formattedUrl;
+
+    /*Audio: P R in TABLE*/
     const tags = parseTags(cells[8]);
 
     const rowKey = `row${i}`;
@@ -211,17 +197,17 @@ tr.dataset.previewImage = formattedUrl;
     if (url) {
       tr.style.cursor = "pointer";
       tr.addEventListener("click", (e) => {
-  // Only trigger row link if not clicking a location pill
-  if (e.target.closest(".location")) return;
-  window.open(url, "_blank", "noopener,noreferrer");
-});
+        // Only trigger row link if not clicking a location pill
+        if (e.target.closest(".location")) return;
+        window.open(url, "_blank", "noopener,noreferrer");
+      });
     }
-/*!!PILLZOOMSTUFF!!*/
 
+    /*!!PILLZOOMSTUFF!!*/
     tr.dataset.tags = JSON.stringify(tags);
     tr.addEventListener("mouseenter", () => highlightPills(tags));
     tr.addEventListener("mouseleave", resetPills);
-/*!!TABLE(LIST) IS "RENDERED!!*/
+    /*!!TABLE(LIST) IS "RENDERED!!*/
 
 /*MOUSEOVER STUFF*/
 
@@ -581,7 +567,7 @@ function sortByColumn(index) {
     }
   }
 
-  renderTable(sorted);
+  renderTable(sorted.map((row, i) => ({ row, index: i })));
 }
 /*FUNCTION:------>CLICK ON Column to Sort*/
 
@@ -708,9 +694,11 @@ clearBtn.className = "clear-all-btn";
 //filtersystem
 function filterByCategories() {
   filteredRows = selectedCategories.length === 0
-    ? dataRows
-    : dataRows.filter(row => {
-        const tags = parseTags(row[8]); // ✅ Use tag parser here
+  ? dataRows.map((row, i) => ({ row, index: i }))
+  : dataRows
+      .map((row, i) => ({ row, index: i }))
+      .filter(({ row }) => {
+        const tags = parseTags(row[8]);
         return selectedCategories.some(cat => tags.includes(cat));
       });
 
