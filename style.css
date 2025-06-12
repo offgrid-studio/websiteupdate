@@ -33,6 +33,7 @@ body {
 }
 
 /* Sticky header row (below pills) */
+/* (NOTE: These li styles appear unused—likely a leftover. If not used, you can remove them.) */
 #sheetTable li {
   transition: transform 0.15s ease;
   transform-origin: center center;
@@ -42,8 +43,9 @@ body {
   transform: scale(1);
 }
 
+/* Reset padding on td; we'll use .row-inner for consistent control */
 #sheetTable td {
-  padding: 10px 14px;
+  padding: 0; /* moved to .row-inner */
   border-bottom: 0.5px solid #eee;
   min-width: 100px;
   box-sizing: border-box;
@@ -52,21 +54,39 @@ body {
   line-height: 1.2;
 }
 
+/* Table row styling */
 #sheetTable tbody tr {
   height: 3.5em; /* enough for 2 lines of text */
   overflow: hidden;
   background-color: #000;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  transition: background-color 0.2s ease;
   transform-origin: left center;
-  transition: all 0.3s ease;
+  /* Removed conflicting transform/opacity/font-size/padding animations */
 }
 
+/* ✅ Inner wrapper div for hover animation and layout control */
+.row-inner {
+  display: inline-block;
+  width: 100%;
+  padding: 10px 14px; /* restores spacing inside each cell */
+  will-change: transform;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* On hover: visual effect (GSAP handles scale) */
+.row-inner:hover {
+  background-color: #111; /* or use a highlight color */
+  box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1); /* subtle lift */
+  cursor: pointer;
+}
+
+/* ✅ Neutralize old row hover styling that conflicted with GSAP */
 #sheetTable tbody tr:hover {
   opacity: 1;
-  font-size: 1.4em;
-  padding: 14px 14px; /* slightly increase padding */
-  background-color: #111; /* or use a highlight color */
-  box-shadow: 0 1px 2px rgba(255,255,255,0.1); /* subtle lift */
+  font-size: inherit;
+  padding: 0;
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .location {
@@ -194,11 +214,12 @@ th.sorted-desc::after {
 
 .grid-card {
   position: relative;
+  /*
   transform: scale(1.2) translateY(0);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease;*/
   z-index: 1;
-  overflow: hidden;
-  will-change: transform;
+  /*overflow: hidden;
+  will-change: transform;*/
 }
 
 .grid-card img {
@@ -206,7 +227,7 @@ th.sorted-desc::after {
   height: auto;
   display: block;
   border-radius: 12px;
-  transition: transform 0.35s ease;
+  /*transition: transform 0.35s ease;*/
   object-fit: cover;
 }
 
@@ -215,18 +236,6 @@ th.sorted-desc::after {
   color: #aaa;
   margin-top: 8px;
   transition: transform 0.5s ease;
-}
-
-/* On hover: scale entire card, including image and text */
-.grid-card:hover {
-  transform: scale(1.4) translateY(-2px); /* Zoom + lift */
-  z-index: 10;
-}
-
-/* All others shrink slightly */
-#gridView:hover .grid-card:not(:hover) {
-  transform: scale(0.9) translateY(0); /* Shrink, no lift */
-  z-index: 1;
 }
 
 /*CLEAR BUTTON FOR CATEGORY LOGIC*/

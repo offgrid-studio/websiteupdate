@@ -209,48 +209,42 @@ function renderTable(rowsWithIndex) {
     tr.addEventListener("mouseleave", resetPills);
     /*!!TABLE(LIST) IS "RENDERED!!*/
 
-/*MOUSEOVER STUFF*/
+    /*MOUSEOVER IMAGE PREVIEW*/
+    tr.addEventListener("mouseenter", () => {
+      const preview = document.getElementById("imagePreview");
+      const content = document.getElementById("previewContent");
+      content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
+      preview.classList.remove("active");
+      void preview.offsetWidth; // Force reflow to reset animation
+      preview.classList.add("active");
+      clearTimeout(preview.hideTimer);
+    });
 
-/*MOUSEOVER IMAGE PREVIEW*/
-tr.addEventListener("mouseenter", () => {
-  const preview = document.getElementById("imagePreview");
-  const content = document.getElementById("previewContent");
+    tr.addEventListener("mousemove", (e) => {
+      const preview = document.getElementById("imagePreview");
+      preview.style.left = `${e.pageX + 20}px`;
+      preview.style.top = `${e.pageY - 20}px`;
+    });
 
-  content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
+    tr.addEventListener("mouseleave", (e) => {
+      const preview = document.getElementById("imagePreview");
+      const content = document.getElementById("previewContent");
+      preview.hideTimer = setTimeout(() => {
+        preview.classList.remove("active");
+        setTimeout(() => {
+          content.innerHTML = "";
+        }, 500);
+      }, 50);
+    });
+    /*MOUSEOVER IMAGE PREVIEW*/
 
-  // Reset the animation even if it was already active
-  preview.classList.remove("active");
-  void preview.offsetWidth; // Force reflow to reset animation
-  preview.classList.add("active");
-
-  clearTimeout(preview.hideTimer);
-});
-
-tr.addEventListener("mousemove", (e) => {
-  const preview = document.getElementById("imagePreview");
-  preview.style.left = `${e.pageX + 20}px`;
-  preview.style.top = `${e.pageY - 20}px`;
-});
-
-tr.addEventListener("mouseleave", (e) => {
-  const preview = document.getElementById("imagePreview");
-  const content = document.getElementById("previewContent");
-
-  // Remove the preview immediately or after a short delay
-  preview.hideTimer = setTimeout(() => {
-    preview.classList.remove("active");
-    setTimeout(() => {
-      content.innerHTML = "";
-    }, 500); // match CSS transition time
-  }, 50); // small delay to prevent flicker
-});
-/*MOUSEOVER IMAGE PREVIEW*/
-
-/*GOOGLESHEET: if location - make pill*/
+    /*GOOGLESHEET: if location - make pill*/
     cells.forEach((cell, index) => {
-      if (index > 4) return; // hide columns F, G, H+
+      if (index > 4) return;
 
       const td = document.createElement("td");
+      const inner = document.createElement("div");
+      inner.className = "row-inner";
 
       if (index === 1 && cell.includes("@")) {
         const locationUrl = cells[7];
@@ -264,49 +258,68 @@ tr.addEventListener("mouseleave", (e) => {
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.appendChild(pill);
-          td.appendChild(link);
-          link.addEventListener("click", (e) => {
-    e.stopPropagation(); // stops row click
-  });
 
-  td.appendChild(link);
-  /*GOOGLESHEET: if location - make pill*/
- 
-/*GIF PREVIEW ON HOVER*/
-          link.addEventListener("mousemove", (e) => {//GIF PREVIEW FOLLOWS MOUSE MOVEMENT
+          link.addEventListener("click", (e) => {
+            e.stopPropagation();
+          });
+
+          inner.appendChild(link);
+
+          link.addEventListener("mousemove", (e) => {
             const preview = document.getElementById("imagePreview");
             preview.style.left = `${e.pageX + 20}px`;
             preview.style.top = `${e.pageY - 20}px`;
           });
 
-          link.addEventListener("mouseleave", (e) => { //GIF PREVIEW STOPS
+          link.addEventListener("mouseleave", (e) => {
             const preview = document.getElementById("imagePreview");
             const content = document.getElementById("previewContent");
-            const tr = e.currentTarget.closest("tr");
-            const rowImageUrl = tr.dataset.previewImage;
             content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
           });
-
         } else {
-          td.appendChild(pill);
+          inner.appendChild(pill);
         }
-
       } else if (cell.toLowerCase().includes("places")) {
         const pill = document.createElement("span");
         pill.className = "pill";
         pill.textContent = cell;
-        td.appendChild(pill);
+        inner.appendChild(pill);
       } else {
-        td.textContent = cell;
+        inner.textContent = cell;
       }
 
+      td.appendChild(inner);
       tr.appendChild(td);
     });
 
     tbody.appendChild(tr);
   });
+
+  // ✅ GSAP hover animations on row-inner
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".row-inner").forEach(inner => {
+      inner.addEventListener("mouseenter", () => {
+        console.log("hover in (table row)");
+        gsap.to(inner, {
+          scale: 1.03,
+          duration: 0.3,
+          ease: "power2.out",
+          overwrite: "auto"
+        });
+      });
+
+      inner.addEventListener("mouseleave", () => {
+        console.log("hover out (table row)");
+        gsap.to(inner, {
+          scale: 1.0,
+          duration: 0.3,
+          ease: "power2.out",
+          overwrite: "auto"
+        });
+      });
+    });
+  });
 }
-/*GIF PREVIEW ON HOVER*/
 
 
 /*Audio Envelope*/
@@ -458,23 +471,23 @@ function attachHoverAndClickAudio(el, rowKey, tags) {
 /*Audio MouseOver + Click*/
 
 /*!!RENDER GRID!!*/
-    function renderGridView(rows) {
+function renderGridView(rowsWithIndex) {
   const grid = document.getElementById("gridView");
   grid.innerHTML = "";
 
-  rows.forEach((cells, i) => {
-    const gifUrl = formatGifURL(cells[6]);
-    const projectTitle = cells[0];
-    const year = cells[3];
-    const link = cells[5];
+  rowsWithIndex.forEach(({ row: cells, index: i }) => {
+    const gifUrl = formatGifURL(cells[6]);     // Column G = GIF preview path
+    const projectTitle = cells[0];             // Column A = title
+    const year = cells[3];                     // Column D = year
+    const link = cells[5];                     // Column F = link
 
-    const tags = parseTags(cells[8]);
+    const tags = parseTags(cells[8]);          // Column I = categories
 
     const card = document.createElement("div"); 
     card.className = "grid-card animated";
     card.style.animationDelay = `${i * 10}ms`;
     card.dataset.tags = JSON.stringify(tags);
-    
+
     card.addEventListener("mouseenter", () => highlightPills(tags));
     card.addEventListener("mouseleave", resetPills);
 
@@ -490,15 +503,42 @@ function attachHoverAndClickAudio(el, rowKey, tags) {
     }
 
     // ✅ Pass tags to audio
-    const hoverUrl = formatAudioURL(cells[15]); // Column P
-    const clickUrl = formatAudioURL(cells[17]); // Column R
-    attachHoverAndClickAudio(card, `row${i}`, tags);
+    const rowKey = `row${i}`;
+    attachHoverAndClickAudio(card, rowKey, tags); // Column P/R audio
 
     grid.appendChild(card);
   });
+
+  // ✅ Delay to ensure DOM is fully rendered before applying GSAP
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".grid-card").forEach(card => {
+      card.addEventListener("mouseenter", () => {
+        console.log("hover in:", card); // ✅ LOG to confirm hover is working
+        gsap.to(card, {
+          scale: 1.5,
+          y: -2,
+          duration: 0.5,
+          ease: "power4.out",
+          overwrite: "auto"
+        });
+        card.style.zIndex = "10";
+      });
+
+      card.addEventListener("mouseleave", () => {
+        console.log("hover out:", card); // ✅ LOG to confirm exit is working
+        gsap.to(card, {
+          scale: 1,
+          y: 0,
+          duration: 0.5,
+          ease: "sine.out",
+          overwrite: "auto"
+        });
+        card.style.zIndex = "1";
+      });
+    });
+  });
 }
 /*!!RENDER GRID!!*/
-
 /*!!HIGHLIGHTPILLSTUFF!!*/
 function highlightPills(tags) {
   const pills = document.querySelectorAll(".pill");
