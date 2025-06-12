@@ -1,5 +1,5 @@
 const audioPlayers = {}; // { uniqueKey: { hover: Tone.Player, click: Tone.Player } }
-
+let selectedCategories = [];
 let currentPlayer = null;
 
 // Start Tone.js after first user gesture
@@ -30,6 +30,15 @@ function formatAudioURL(filename) {
 }
 /*AUDIO formats Column filename to full URL ---> where does it define the column?*
 
+
+/* ✅ TAG PARSER: cleanly extract tags, removing empty/invalid ones */
+function parseTags(tagString) {
+  return (tagString || "")
+    .split(";")
+    .map(t => t.trim())
+    .filter(t => !!t && t.toLowerCase() !== "location");
+}
+
 /*GOOGLE SHEET LOADED*/
 async function loadCSV() {
   const response = await fetch("https://docs.google.com/spreadsheets/d/164ps6mI666JLt-q4iVb0FMA5ztPykwRT4mOVAE_zbwE/export?format=csv&gid=11925201");
@@ -40,28 +49,72 @@ async function loadCSV() {
   const tbody = document.querySelector("#sheetTable tbody");
 
   const headers = rows[0];
-  dataRows = rows.slice(1);
+  dataRows = rows.slice(1); // ✅ keep it as arrays
 
+  // === 🧠 Create table headers (skip columns F and beyond) ===
+  thead.innerHTML = ""; // clear old
+  const trHead = document.createElement("tr");
+  headers.forEach((header, index) => {
+    if (index > 4) return; // skip columns F onward
+    const th = document.createElement("th");
+    th.dataset.index = index;
+    th.innerText = header;
+
+    if (index !== 4) {
+      th.addEventListener("click", () => sortByColumn(index));
+    }
+
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
+
+  // === 🔊 Preload audio ===
   await preloadAudioPlayers(dataRows);
 
+  // === 🗂 Sort by year (Column D = index 3), newest to oldest ===
+  dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
+  filteredRows = [...dataRows]; // copy sorted data
 
-  filteredRows = [...dataRows]; // ✅ correct placement
+  // Set visual indicator on sorted column
+  const ths = document.querySelectorAll("thead th");
+  currentSort = { column: 3, direction: 'desc' };
+  ths.forEach(th => {
+    th.classList.remove("sorted", "sorted-desc");
+    if (parseInt(th.dataset.index) === 3) {
+      th.classList.add("sorted", "sorted-desc");
+    }
+  });
+
+  // === 🧪 Render categories AFTER dataRows is set ===
+  renderCategoryPills();
+
+  // === 📋 Render initial table view ===
+  renderTable(filteredRows);
+
+  // === 🧼 Hide grid view initially ===
+  const gridWrapper = document.getElementById("gridWrapper");
+  const gridView = document.getElementById("gridView");
+  gridWrapper.classList.add("hidden");
+  gridView.innerHTML = "";
+
+  // === 🔧 Update sticky header offset ===
+  updateStickyHeaderOffset();
+}
 /*GOOGLE SHEET LOADED*/
 
 /*Audio: preload Audio Player*/
 async function preloadAudioPlayers(rows) {
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const hoverUrl = formatAudioURL(row[15]); // Column P
-    const clickUrl = formatAudioURL(row[17]); // Column R
-    const key = `row${i}`;
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const hoverUrl = formatAudioURL(row[15]);
+    const clickUrl = formatAudioURL(row[17]);
+    const key = `row${index}`;
 
     const hoverPlayer = hoverUrl ? new Tone.Player({ url: hoverUrl, autostart: false }).toDestination() : null;
     const clickPlayer = clickUrl ? new Tone.Player({ url: clickUrl, autostart: false }).toDestination() : null;
 
     audioPlayers[key] = { hover: hoverPlayer, click: clickPlayer };
 
-    // Wait a moment to avoid flooding requests
     await new Promise(r => setTimeout(r, 10));
   }
 
@@ -75,9 +128,6 @@ document.getElementById("categoryFilters").classList.add("sticky-category-bar");
 renderCategoryPills(); // ✅ moved down to after dataRows
 // CATEG
 
-/*DONT DISPLAY F ONWARDS OF GOOGLESHEET*/
-thead.innerHTML = ""; // ✅ clear any old headers
-const trHead = document.createElement("tr");
 headers.forEach((header, index) => {
     if (index > 4) return; // skip columns F and beyond
     const th = document.createElement("th");
@@ -122,7 +172,6 @@ ths.forEach(th => {
   const gridView = document.getElementById("gridView");
   gridWrapper.classList.add("hidden");
   gridView.innerHTML = "";
-}
  /*HOW WILL TABLE(LIST) BE RENDERED*/ 
 
 /*!!TABLE(LIST) IS BEING "RENDERED"!!*/
@@ -135,13 +184,28 @@ function renderTable(rows) {
     const rawGifPath = cells[6];
 const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
 tr.dataset.previewImage = formattedUrl;
+/*Audio: P R in TABLE*/
+    const tags = parseTags(cells[8]);
 
-/*Audio: P R in TABLE*/
-const tags = (cells[8] || "").split(";").map(t => t.trim());
-const hoverUrl = formatAudioURL(cells[15]); // Column P
-const clickUrl = formatAudioURL(cells[17]); // Column R
-attachHoverAndClickAudio(tr, `row${i}`, tags); // ✅ for table
-/*Audio: P R in TABLE*/
+    const rowKey = `row${i}`;
+    const hoverUrl = formatAudioURL(cells[15]); // Column P
+    const clickUrl = formatAudioURL(cells[17]); // Column R
+
+    // ✅ Ensure audioPlayers exists and preload hover/click
+    if (!audioPlayers[rowKey]) audioPlayers[rowKey] = {};
+
+    if (hoverUrl && !audioPlayers[rowKey].hover) {
+      audioPlayers[rowKey].hover = new Tone.Player(hoverUrl).toDestination();
+      audioPlayers[rowKey].hover.autostart = false;
+    }
+
+    if (clickUrl && !audioPlayers[rowKey].click) {
+      audioPlayers[rowKey].click = new Tone.Player(clickUrl).toDestination();
+      audioPlayers[rowKey].click.autostart = false;
+    }
+
+    attachHoverAndClickAudio(tr, rowKey, tags); // ✅ for table
+    /*Audio: P R in TABLE*/
 
     const url = cells[5];
     if (url) {
@@ -221,44 +285,6 @@ tr.addEventListener("mouseleave", (e) => {
 
   td.appendChild(link);
   /*GOOGLESHEET: if location - make pill*/
-
- /*GOOGLESHEET: On Hover -> show lat/long of location*/
-          link.addEventListener("mouseenter", (e) => {
-  const preview = document.getElementById("imagePreview");
-  const content = document.getElementById("previewContent");
-
-  let previewText = "No preview text";
-  const raw = cells[13]?.replace(/["']/g, "").trim(); // Column I, cleaned
-
-  if (raw && raw.includes(",")) {
-    const parts = raw.split(",");
-    if (parts.length === 2) {
-      const lat = parseFloat(parts[0].trim());
-      const lng = parseFloat(parts[1].trim());
-
-      if (!isNaN(lat) && !isNaN(lng)) {
-        const dmsLat = toDMS(lat, true);
-        const dmsLng = toDMS(lng, false);
-        previewText = `${dmsLat}, ${dmsLng}`;
-      } else {
-        previewText = raw.trim(); // fallback to plain
-      }
-    } else {
-      previewText = raw.trim(); // fallback to plain
-    }
-  } else if (raw) {
-    previewText = raw.trim(); // fallback
-  }
-
-  content.textContent = previewText;
-  preview.style.display = "block";
-  requestAnimationFrame(() => {
-    preview.style.opacity = "1";
-  });
-
-  e.stopPropagation();
-});
-/*GOOGLESHEET: On Hover -> show lat/long of location*/
  
 /*GIF PREVIEW ON HOVER*/
           link.addEventListener("mousemove", (e) => {//GIF PREVIEW FOLLOWS MOUSE MOVEMENT
@@ -300,7 +326,10 @@ tr.addEventListener("mouseleave", (e) => {
 /*Audio Envelope*/
 async function playShapedAudio(player, tags = []) {
   console.log("🎯 Tags received:", tags);
-  if (!player || !player.buffer.loaded) return;
+  if (!player || !player.buffer.loaded) {
+    console.warn("⚠️ No player or not loaded");
+    return;
+  }
 
   if (currentPlayer) {
     currentPlayer.stop();
@@ -308,70 +337,107 @@ async function playShapedAudio(player, tags = []) {
   }
 
   const now = Tone.now();
-  const attack = Math.random() * 0.3 + 0.05;
-  const decay = Math.random() * 0.1 + 0.05;               // 0.05–0.35s
-  const sustain = Math.random() * 0.2 + 0.01;
-  const release = Math.random() * 0.1 + 0.05;
-  const cutoff = Math.random() * 9500 + 500;
+  const attack = Math.random() * 0.3 + 0.1;
+  const decay = Math.random() * 0.2 + 0.05;
+  const sustain = Math.random() * 0.1 + 0.01;
+  const release = Math.random() * 0.3 + 0.005;
+  const cutoff = Math.random() * 12000 + 50;
+
+  console.log(`🎛️ Attack: ${attack.toFixed(2)}s | Decay: ${decay.toFixed(2)}s | Sustain: ${sustain.toFixed(2)} | Release: ${release.toFixed(2)}s`);
+  console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
 
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
   const gainNode = new Tone.Gain(0);
-  let fx;
 
-  // 🎯 Choose effect based on tags
-const tagMatch = (needles) => {
-  return Array.isArray(tags) && tags.some(tag =>
-    needles.some(needle =>
-      tag.trim().toLowerCase() === needle.trim().toLowerCase()
-    )
-  );
-};
+  const effectsChain = [];
 
-if (tagMatch(["Octaphonic", "Quadrophonic"])) {
-  const startFreq = Math.random() * (50 - 15) + 15;
-const endFreq = 0.1; // target frequency
-const rampTime = 2; // seconds
+  // 🎯 Tag matching helper
+  const tagMatch = (needles) => {
+    return Array.isArray(tags) && tags.some(tag =>
+      needles.some(needle =>
+        tag.trim().toLowerCase() === needle.trim().toLowerCase()
+      )
+    );
+  };
 
-console.log(`🌐 Auto-panner start frequency: ${startFreq.toFixed(2)} Hz`);
+  // === 🎛 FX MATCHES ===
+  if (tagMatch(["Octaphonic", "Quadrophonic"])) {
+    console.log("🌐 Auto-panner activated");
+    const startFreq = Math.random() * 25 + 25;
+    const endFreq = 0.1;
+    const rampTime = 2;
 
-const panner = new Tone.AutoPanner({
-  frequency: startFreq,
-  depth: 1,
-  type: "sine"
-}).start();
+    const panner = new Tone.AutoPanner({
+      frequency: startFreq,
+      depth: 1,
+      type: "sine"
+    }).start();
 
-// Exponential ramp to slower frequency
-panner.frequency.setValueAtTime(startFreq, Tone.now());
-panner.frequency.exponentialRampToValueAtTime(endFreq, Tone.now() + rampTime);
-
-fx = panner;
-
-} else if (tagMatch(["Social Media", "Ad Campaign"])) {
-  console.log("🎮 Using bitcrusher");
-
-  fx = new Tone.BitCrusher(4);
-
-} else {
-  const useReverb = Math.random() < 0.5;
-
-  if (useReverb) {
-    console.log("🧼 Using reverb");
-
-    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
-    reverb.wet.value = 0.3;
-    await reverb.generate();
-
-    fx = reverb;
-
-  } else {
-    console.log("🔁 Using delay");
-
-    const delay = new Tone.FeedbackDelay("8n", 0.1);
-    delay.wet.value = 0.1;
-
-    fx = delay;
+    panner.frequency.setValueAtTime(startFreq, now);
+    panner.frequency.exponentialRampToValueAtTime(endFreq, now + rampTime);
+    effectsChain.push(panner);
   }
-}
+
+  if (tagMatch(["Social Media", "Ad Campaign"])) {
+    console.log("🎧 Chorus + animated delay");
+
+    const highDepth = Math.random() * 0.5 + 0.5;
+    const lowDepth = Math.random() * 0.3 + 0.1;
+    const rampTime = Math.random() * 1.5 + 0.5;
+
+    const chorus = new Tone.Chorus({
+      frequency: 1.5,
+      delayTime: 3.5,
+      depth: highDepth,
+      type: "sine",
+      spread: 180,
+      wet: 0.6
+    }).start();
+
+    setTimeout(() => {
+      chorus.depth = lowDepth;
+    }, rampTime * 1000);
+
+    const delay = new Tone.FeedbackDelay({
+      delayTime: 0.2,
+      feedback: 0.3,
+      wet: 0.3
+    });
+
+    const startDelay = Math.random() * 0.4 + 0.1;
+    const endDelay = Math.random() * 0.04 + 0.01;
+
+    delay.delayTime.setValueAtTime(startDelay, now);
+    delay.delayTime.exponentialRampToValueAtTime(endDelay, now + rampTime);
+
+    chorus.connect(delay);
+    effectsChain.push(chorus, delay);
+  }
+
+  // === Fallback if nothing matched ===
+  if (effectsChain.length === 0) {
+    console.log("🎲 No matching FX — using fallback");
+    const useReverb = Math.random() < 0.5;
+
+    if (useReverb) {
+      console.log("🧼 Using reverb");
+      const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
+      reverb.wet.value = 0.3;
+      await reverb.generate();
+      effectsChain.push(reverb);
+    } else {
+      console.log("🔁 Using delay");
+      const delay = new Tone.FeedbackDelay("16n", 0.3);
+      delay.wet.value = 0.1;
+      effectsChain.push(delay);
+    }
+  }
+
+  // 🔗 Chain all FX together
+  for (let i = 0; i < effectsChain.length - 1; i++) {
+    effectsChain[i].connect(effectsChain[i + 1]);
+  }
+  const fx = effectsChain[effectsChain.length - 1];
 
   gainNode.connect(fx);
   fx.toDestination();
@@ -380,8 +446,10 @@ fx = panner;
   player.connect(filter);
   filter.connect(gainNode);
 
+  // Envelope
   gainNode.gain.setValueAtTime(0, now);
   gainNode.gain.linearRampToValueAtTime(1, now + attack);
+  gainNode.gain.linearRampToValueAtTime(sustain, now + attack + decay);
   gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);
 
   player.start(now);
@@ -414,7 +482,7 @@ function attachHoverAndClickAudio(el, rowKey, tags) {
     const year = cells[3];
     const link = cells[5];
 
-    const tags = (cells[8] || "").split(";").map(t => t.trim()); // ✅ Define tags here
+    const tags = parseTags(cells[8]);
 
     const card = document.createElement("div"); 
     card.className = "grid-card animated";
@@ -444,9 +512,11 @@ function attachHoverAndClickAudio(el, rowKey, tags) {
   });
 }
 /*!!RENDER GRID!!*/
+
 /*!!HIGHLIGHTPILLSTUFF!!*/
 function highlightPills(tags) {
   const pills = document.querySelectorAll(".pill");
+  document.querySelectorAll(".pill[data-category]");
   pills.forEach(pill => {
     const category = pill.getAttribute("data-category");
     if (tags.includes(category)) {
@@ -514,7 +584,7 @@ function sortByColumn(index) {
   renderTable(sorted);
 }
 /*FUNCTION:------>CLICK ON Column to Sort*/
-let selectedCategories = [];
+
 
 //categories(?)
 /*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
@@ -564,13 +634,8 @@ function renderCategoryPills() {
 
   // Gather all unique categories from column I (index 8)
   dataRows.forEach(row => {
-    if (row[8]) {
-      row[8].split(";").forEach(cat => {
-        const trimmed = cat.trim();
-        if (trimmed) allCategories.add(trimmed);
-      });
-    }
-  });
+  parseTags(row[8]).forEach(cat => allCategories.add(cat));
+});
 
   // Create pill elements
   [...allCategories].sort().forEach(cat => {
@@ -645,12 +710,12 @@ function filterByCategories() {
   filteredRows = selectedCategories.length === 0
     ? dataRows
     : dataRows.filter(row => {
-        const tags = (row[8] || "").split(";").map(t => t.trim());
+        const tags = parseTags(row[8]); // ✅ Use tag parser here
         return selectedCategories.some(cat => tags.includes(cat));
       });
 
   const sheetTable = document.getElementById("sheetTable");
-  const gridWrapper = document.getElementById("gridWrapper"); // ✅ FIXED
+  const gridWrapper = document.getElementById("gridWrapper");
 
   if (gridWrapper.classList.contains("hidden")) {
     sheetTable.classList.remove("hidden");
@@ -680,21 +745,3 @@ function updateStickyHeaderOffset() {
 window.addEventListener("load", updateStickyHeaderOffset);
 window.addEventListener("resize", updateStickyHeaderOffset);
 /*STICKYHEADER: Adjust(?), move to sit right*/
-
-
-/*AUDIO BUTTON TEST*/
-document.getElementById("toneTestBtn").addEventListener("click", async () => {
-  await Tone.start();
-  console.log("🔊 Tone.js started");
-
-  const rawFilename = "22CC_SYNSYMESH2_CLICK.mp3"; // ← filename only
-  const url = formatAudioURL(rawFilename); // ← uses your formatter
-
-  const player = new Tone.Player(url).toDestination();
-  player.autostart = true;
-});
-/*AUDIO BUTTON TEST*/
-
-//LOAD SHEET
-    loadCSV();
- 
