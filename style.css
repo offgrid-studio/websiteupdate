@@ -194,10 +194,11 @@ th.sorted-desc::after {
 
 .grid-card {
   position: relative;
-  transform: scale(1.2);
+  transform: scale(1.2) translateY(0);
   transition: transform 0.25s ease;
   z-index: 1;
   overflow: hidden;
+  will-change: transform;
 }
 
 .grid-card img {
@@ -218,13 +219,13 @@ th.sorted-desc::after {
 
 /* On hover: scale entire card, including image and text */
 .grid-card:hover {
-  transform: scale(1.4);
+  transform: scale(1.4) translateY(-2px); /* Zoom + lift */
   z-index: 10;
 }
 
 /* All others shrink slightly */
 #gridView:hover .grid-card:not(:hover) {
-  transform: scale(0.9);
+  transform: scale(0.9) translateY(0); /* Shrink, no lift */
   z-index: 1;
 }
 

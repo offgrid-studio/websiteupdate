@@ -137,9 +137,10 @@ const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/15
 tr.dataset.previewImage = formattedUrl;
 
 /*Audio: P R in TABLE*/
+const tags = (cells[8] || "").split(";").map(t => t.trim());
 const hoverUrl = formatAudioURL(cells[15]); // Column P
 const clickUrl = formatAudioURL(cells[17]); // Column R
-attachHoverAndClickAudio(tr, `row${i}`);
+attachHoverAndClickAudio(tr, `row${i}`, tags); // ✅ for table
 /*Audio: P R in TABLE*/
 
     const url = cells[5];
@@ -152,7 +153,7 @@ attachHoverAndClickAudio(tr, `row${i}`);
 });
     }
 /*!!PILLZOOMSTUFF!!*/
-const tags = (cells[8] || "").split(";").map(t => t.trim());
+
     tr.dataset.tags = JSON.stringify(tags);
     tr.addEventListener("mouseenter", () => highlightPills(tags));
     tr.addEventListener("mouseleave", resetPills);
@@ -297,48 +298,79 @@ tr.addEventListener("mouseleave", (e) => {
 
 
 /*Audio Envelope*/
-async function playShapedAudio(player) {
-  if (!player || !player.buffer.loaded) {
-    console.warn("⚠️ Player not loaded");
-    return;
-  }
+async function playShapedAudio(player, tags = []) {
+  console.log("🎯 Tags received:", tags);
+  if (!player || !player.buffer.loaded) return;
 
-  // Stop previous playback
   if (currentPlayer) {
     currentPlayer.stop();
-    currentPlayer.disconnect(); // fully disconnect routing
+    currentPlayer.disconnect();
   }
 
-  const randomBetween = (min, max) => Math.random() * (max - min) + min;
-
-  const attack = randomBetween(0.01, 0.3);
-  const release = randomBetween(0.1, 0.5);
-  const cutoff = randomBetween(500, 10000);
   const now = Tone.now();
-
-  console.log(`🎛️ Attack: ${attack}s | Release: ${release}s`);
-  console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
+  const attack = Math.random() * 0.3 + 0.05;
+  const decay = Math.random() * 0.1 + 0.05;               // 0.05–0.35s
+  const sustain = Math.random() * 0.2 + 0.01;
+  const release = Math.random() * 0.1 + 0.05;
+  const cutoff = Math.random() * 9500 + 500;
 
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
   const gainNode = new Tone.Gain(0);
-
-  // Choose FX path randomly
-  const useReverb = Math.random() < 0.5;
   let fx;
 
-  if (useReverb) {
-  console.log("🌀 Using reverb");
+  // 🎯 Choose effect based on tags
+const tagMatch = (needles) => {
+  return Array.isArray(tags) && tags.some(tag =>
+    needles.some(needle =>
+      tag.trim().toLowerCase() === needle.trim().toLowerCase()
+    )
+  );
+};
 
-  const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
-  reverb.wet.value = 0.3;
-  await reverb.generate(); // required for correct routing
-  fx = reverb;
+if (tagMatch(["Octaphonic", "Quadrophonic"])) {
+  const startFreq = Math.random() * (50 - 15) + 15;
+const endFreq = 0.1; // target frequency
+const rampTime = 2; // seconds
+
+console.log(`🌐 Auto-panner start frequency: ${startFreq.toFixed(2)} Hz`);
+
+const panner = new Tone.AutoPanner({
+  frequency: startFreq,
+  depth: 1,
+  type: "sine"
+}).start();
+
+// Exponential ramp to slower frequency
+panner.frequency.setValueAtTime(startFreq, Tone.now());
+panner.frequency.exponentialRampToValueAtTime(endFreq, Tone.now() + rampTime);
+
+fx = panner;
+
+} else if (tagMatch(["Social Media", "Ad Campaign"])) {
+  console.log("🎮 Using bitcrusher");
+
+  fx = new Tone.BitCrusher(4);
+
 } else {
-  console.log("🔁 Using delay");
+  const useReverb = Math.random() < 0.5;
 
-  const delay = new Tone.FeedbackDelay({ delayTime: 0.03, feedback: 0.5 });
-  delay.wet.value = 0.3;
-  fx = delay;
+  if (useReverb) {
+    console.log("🧼 Using reverb");
+
+    const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
+    reverb.wet.value = 0.3;
+    await reverb.generate();
+
+    fx = reverb;
+
+  } else {
+    console.log("🔁 Using delay");
+
+    const delay = new Tone.FeedbackDelay("8n", 0.1);
+    delay.wet.value = 0.1;
+
+    fx = delay;
+  }
 }
 
   gainNode.connect(fx);
@@ -358,15 +390,15 @@ async function playShapedAudio(player) {
 /*Audio Envelope*/
 
 /*Audio MouseOver + Click*/
-function attachHoverAndClickAudio(el, rowKey) {
+function attachHoverAndClickAudio(el, rowKey, tags) {
   el.addEventListener("mouseenter", () => {
     const player = audioPlayers[rowKey]?.hover;
-    if (player) playShapedAudio(player);
+    if (player) playShapedAudio(player, tags);
   });
 
   el.addEventListener("click", () => {
     const player = audioPlayers[rowKey]?.click;
-    if (player) playShapedAudio(player);
+    if (player) playShapedAudio(player, tags);
   });
 }
 /*Audio MouseOver + Click*/
@@ -377,19 +409,18 @@ function attachHoverAndClickAudio(el, rowKey) {
   grid.innerHTML = "";
 
   rows.forEach((cells, i) => {
-
     const gifUrl = formatGifURL(cells[6]);
     const projectTitle = cells[0];
     const year = cells[3];
     const link = cells[5];
 
-    const tags = (cells[8] || "").split(";").map(t => t.trim());
+    const tags = (cells[8] || "").split(";").map(t => t.trim()); // ✅ Define tags here
 
     const card = document.createElement("div"); 
-
     card.className = "grid-card animated";
-    card.style.animationDelay = `${i * 40}ms`;
+    card.style.animationDelay = `${i * 10}ms`;
     card.dataset.tags = JSON.stringify(tags);
+    
     card.addEventListener("mouseenter", () => highlightPills(tags));
     card.addEventListener("mouseleave", resetPills);
 
@@ -403,15 +434,16 @@ function attachHoverAndClickAudio(el, rowKey) {
         window.open(link, "_blank", "noopener,noreferrer");
       });
     }
-         /*Audio: P R in GRID*/
+
+    // ✅ Pass tags to audio
     const hoverUrl = formatAudioURL(cells[15]); // Column P
     const clickUrl = formatAudioURL(cells[17]); // Column R
-    attachHoverAndClickAudio(card, `row${i}`);
-    /*Audio: P R in GRID*/
+    attachHoverAndClickAudio(card, `row${i}`, tags);
 
     grid.appendChild(card);
   });
 }
+/*!!RENDER GRID!!*/
 /*!!HIGHLIGHTPILLSTUFF!!*/
 function highlightPills(tags) {
   const pills = document.querySelectorAll(".pill");
