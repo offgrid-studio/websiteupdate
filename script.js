@@ -170,52 +170,44 @@ function renderTable(rowsWithIndex) {
     const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
     tr.dataset.previewImage = formattedUrl;
 
-    /*Audio: P R in TABLE*/
     const tags = parseTags(cells[8]);
-
     const rowKey = `row${i}`;
-    const hoverUrl = formatAudioURL(cells[15]); // Column P
-    const clickUrl = formatAudioURL(cells[17]); // Column R
+    const hoverUrl = formatAudioURL(cells[15]);
+    const clickUrl = formatAudioURL(cells[17]);
 
-    // ✅ Ensure audioPlayers exists and preload hover/click
+    // Audio preload fallback
     if (!audioPlayers[rowKey]) audioPlayers[rowKey] = {};
-
     if (hoverUrl && !audioPlayers[rowKey].hover) {
       audioPlayers[rowKey].hover = new Tone.Player(hoverUrl).toDestination();
       audioPlayers[rowKey].hover.autostart = false;
     }
-
     if (clickUrl && !audioPlayers[rowKey].click) {
       audioPlayers[rowKey].click = new Tone.Player(clickUrl).toDestination();
       audioPlayers[rowKey].click.autostart = false;
     }
 
-    attachHoverAndClickAudio(tr, rowKey, tags); // ✅ for table
-    /*Audio: P R in TABLE*/
+    attachHoverAndClickAudio(tr, rowKey, tags);
 
     const url = cells[5];
     if (url) {
       tr.style.cursor = "pointer";
       tr.addEventListener("click", (e) => {
-        // Only trigger row link if not clicking a location pill
         if (e.target.closest(".location")) return;
         window.open(url, "_blank", "noopener,noreferrer");
       });
     }
 
-    /*!!PILLZOOMSTUFF!!*/
     tr.dataset.tags = JSON.stringify(tags);
     tr.addEventListener("mouseenter", () => highlightPills(tags));
     tr.addEventListener("mouseleave", resetPills);
-    /*!!TABLE(LIST) IS "RENDERED!!*/
 
-    /*MOUSEOVER IMAGE PREVIEW*/
+    // Image preview
     tr.addEventListener("mouseenter", () => {
       const preview = document.getElementById("imagePreview");
       const content = document.getElementById("previewContent");
       content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
       preview.classList.remove("active");
-      void preview.offsetWidth; // Force reflow to reset animation
+      void preview.offsetWidth;
       preview.classList.add("active");
       clearTimeout(preview.hideTimer);
     });
@@ -226,7 +218,7 @@ function renderTable(rowsWithIndex) {
       preview.style.top = `${e.pageY - 20}px`;
     });
 
-    tr.addEventListener("mouseleave", (e) => {
+    tr.addEventListener("mouseleave", () => {
       const preview = document.getElementById("imagePreview");
       const content = document.getElementById("previewContent");
       preview.hideTimer = setTimeout(() => {
@@ -236,15 +228,11 @@ function renderTable(rowsWithIndex) {
         }, 500);
       }, 50);
     });
-    /*MOUSEOVER IMAGE PREVIEW*/
 
-    /*GOOGLESHEET: if location - make pill*/
+    // Cells: only show first 5 (index 0-4)
     cells.forEach((cell, index) => {
       if (index > 4) return;
-
       const td = document.createElement("td");
-      const inner = document.createElement("div");
-      inner.className = "row-inner";
 
       if (index === 1 && cell.includes("@")) {
         const locationUrl = cells[7];
@@ -258,68 +246,46 @@ function renderTable(rowsWithIndex) {
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.appendChild(pill);
-
-          link.addEventListener("click", (e) => {
-            e.stopPropagation();
-          });
-
-          inner.appendChild(link);
-
-          link.addEventListener("mousemove", (e) => {
-            const preview = document.getElementById("imagePreview");
-            preview.style.left = `${e.pageX + 20}px`;
-            preview.style.top = `${e.pageY - 20}px`;
-          });
-
-          link.addEventListener("mouseleave", (e) => {
-            const preview = document.getElementById("imagePreview");
-            const content = document.getElementById("previewContent");
-            content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
-          });
+          td.appendChild(link);
+          link.addEventListener("click", (e) => e.stopPropagation());
         } else {
-          inner.appendChild(pill);
+          td.appendChild(pill);
         }
       } else if (cell.toLowerCase().includes("places")) {
         const pill = document.createElement("span");
         pill.className = "pill";
         pill.textContent = cell;
-        inner.appendChild(pill);
+        td.appendChild(pill);
       } else {
-        inner.textContent = cell;
+        td.textContent = cell;
       }
 
-      td.appendChild(inner);
       tr.appendChild(td);
+    });
+
+    // GSAP row hover
+    tr.addEventListener("mouseenter", () => {
+      gsap.to(tr, {
+        scale: 1.03,
+        duration: 0.3,
+        ease: "power2.out",
+        overwrite: "auto"
+      });
+    });
+
+    tr.addEventListener("mouseleave", () => {
+      gsap.to(tr, {
+        scale: 1.0,
+        duration: 0.3,
+        ease: "power2.out",
+        overwrite: "auto"
+      });
     });
 
     tbody.appendChild(tr);
   });
-
-  // ✅ GSAP hover animations on row-inner
-  requestAnimationFrame(() => {
-    document.querySelectorAll(".row-inner").forEach(inner => {
-      inner.addEventListener("mouseenter", () => {
-        console.log("hover in (table row)");
-        gsap.to(inner, {
-          scale: 1.03,
-          duration: 0.3,
-          ease: "power2.out",
-          overwrite: "auto"
-        });
-      });
-
-      inner.addEventListener("mouseleave", () => {
-        console.log("hover out (table row)");
-        gsap.to(inner, {
-          scale: 1.0,
-          duration: 0.3,
-          ease: "power2.out",
-          overwrite: "auto"
-        });
-      });
-    });
-  });
 }
+/*GIF PREVIEW ON HOVER*/
 
 
 /*Audio Envelope*/
@@ -529,8 +495,8 @@ function renderGridView(rowsWithIndex) {
         gsap.to(card, {
           scale: 1,
           y: 0,
-          duration: 0.5,
-          ease: "sine.out",
+          duration: 1,
+          ease: "circ.out",
           overwrite: "auto"
         });
         card.style.zIndex = "1";
