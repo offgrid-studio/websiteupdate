@@ -49,7 +49,7 @@ async function loadCSV() {
   const tbody = document.querySelector("#sheetTable tbody");
 
   const headers = rows[0];
-  dataRows = rows.slice(1); // ✅ keep it as arrays
+  dataRows = rows.slice(1); // ✅ keep it as arrays(⚠️LEAVES OUT FIRST ROW)
 
   // === 🧠 Create table headers (skip columns F and beyond) ===
   thead.innerHTML = ""; // clear old
@@ -71,7 +71,7 @@ async function loadCSV() {
   // === 🔊 Preload audio ===
   await preloadAudioPlayers(dataRows);
 
-  // === 🗂 Sort by year (Column D = index 3), newest to oldest ===
+  // === 🗂 Sort by year (Column D = index 3), newest to oldest ===   ⚠️⚠️!only works when "clicktwice"
   dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
   filteredRows = dataRows.map((row, i) => ({ row, index: i })); // copy sorted data
 
@@ -102,12 +102,12 @@ async function loadCSV() {
 }
 /*GOOGLE SHEET LOADED*/
 
-/*Audio: preload Audio Player*/
+/*Audio: preload Audio Player🔊🔊🔊🔊🔊🔊🔊🔊 ROWS 6F7G*/ 
 async function preloadAudioPlayers(rows) {
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
-    const hoverUrl = formatAudioURL(row[15]);
-    const clickUrl = formatAudioURL(row[17]);
+    const hoverUrl = formatAudioURL(row[5]);
+    const clickUrl = formatAudioURL(row[6]);
     const key = `row${index}`;
 
     const hoverPlayer = hoverUrl ? new Tone.Player({ url: hoverUrl, autostart: false }).toDestination() : null;
@@ -128,7 +128,7 @@ document.getElementById("categoryFilters").classList.add("sticky-category-bar");
 renderCategoryPills(); // ✅ moved down to after dataRows
 // CATEG
   
-/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED*/
+/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED           ⚠️⚠️--> EXISTSTWICE⚠️⚠️*/
  // Sort dataRows by year (Column D = index 3), newest to oldest
 dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
 filteredRows = [...dataRows]; // copy sorted
@@ -159,21 +159,22 @@ ths.forEach(th => {
   gridView.innerHTML = "";
  /*HOW WILL TABLE(LIST) BE RENDERED*/ 
 
-/*!!TABLE(LIST) IS BEING "RENDERED"!!*/
+/*!!TABLE(LIST) IS BEING "RENDERED"!! ---> SHEET: COLUMNS FOR GIF🌠🌠🌠🌠🌠 GIF_ROW 8H
+*/
 function renderTable(rowsWithIndex) {
   const tbody = document.querySelector("#sheetTable tbody");
   tbody.innerHTML = "";
 
   rowsWithIndex.forEach(({ row: cells, index: i }) => {
     const tr = document.createElement("tr");
-    const rawGifPath = cells[6];
+    const rawGifPath = cells[7];
     const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
     tr.dataset.previewImage = formattedUrl;
 
     const tags = parseTags(cells[8]);
     const rowKey = `row${i}`;
-    const hoverUrl = formatAudioURL(cells[15]);
-    const clickUrl = formatAudioURL(cells[17]);
+    const hoverUrl = formatAudioURL(cells[5]);
+    const clickUrl = formatAudioURL(cells[6]);
 
     // Audio preload fallback
     if (!audioPlayers[rowKey]) audioPlayers[rowKey] = {};
@@ -188,7 +189,7 @@ function renderTable(rowsWithIndex) {
 
     attachHoverAndClickAudio(tr, rowKey, tags);
 
-    const url = cells[5];
+    const url = cells[8];     // LINK2PROJECT❓
     if (url) {
       tr.style.cursor = "pointer";
       tr.addEventListener("click", (e) => {
@@ -233,9 +234,9 @@ function renderTable(rowsWithIndex) {
     cells.forEach((cell, index) => {
       if (index > 4) return;
       const td = document.createElement("td");
-
+   // Cells: only show first 5 (index 0-4)📍📍📍📍📍📍📍📍📍📍LOCATION 10J
       if (index === 1 && cell.includes("@")) {
-        const locationUrl = cells[7];
+        const locationUrl = cells[9];  // 📍📍📍📍📍📍📍📍📍📍LOCATION 10J
         const pill = document.createElement("span");
         pill.className = "location";
         pill.textContent = `${cell} 📍`;
@@ -440,14 +441,14 @@ function attachHoverAndClickAudio(el, rowKey, tags) {
 function renderGridView(rowsWithIndex) {
   const grid = document.getElementById("gridView");
   grid.innerHTML = "";
-
+  // GRID COLUMNS ❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️
   rowsWithIndex.forEach(({ row: cells, index: i }) => {
-    const gifUrl = formatGifURL(cells[6]);     // Column G = GIF preview path
+    const gifUrl = formatGifURL(cells[7]);     // Column 8H = GIF preview path
     const projectTitle = cells[0];             // Column A = title
     const year = cells[3];                     // Column D = year
-    const link = cells[5];                     // Column F = link
+    const link = cells[8];                     // Column I9 = link
 
-    const tags = parseTags(cells[8]);          // Column I = categories
+    const tags = parseTags(cells[10]);          // Column 11K = categories
 
     const card = document.createElement("div"); 
     card.className = "grid-card animated";
@@ -624,9 +625,9 @@ function renderCategoryPills() {
 
   const allCategories = new Set();
 
-  // Gather all unique categories from column I (index 8)
+  // Gather all unique categories from column K (index 11)🗂️🗂️🗂️🗂️🗂️🗂️🗂️ ROWS!!
   dataRows.forEach(row => {
-  parseTags(row[8]).forEach(cat => allCategories.add(cat));
+  parseTags(row[11]).forEach(cat => allCategories.add(cat));
 });
 
   // Create pill elements
@@ -697,14 +698,14 @@ clearBtn.className = "clear-all-btn";
     container.appendChild(clearBtn);
   }
 }
-//filtersystem
+//filtersystem🗂️🗂️🗂️🗂️🗂️🗂️🗂️ ROWS!!
 function filterByCategories() {
   filteredRows = selectedCategories.length === 0
   ? dataRows.map((row, i) => ({ row, index: i }))
   : dataRows
       .map((row, i) => ({ row, index: i }))
       .filter(({ row }) => {
-        const tags = parseTags(row[8]);
+        const tags = parseTags(row[11]);
         return selectedCategories.some(cat => tags.includes(cat));
       });
 
