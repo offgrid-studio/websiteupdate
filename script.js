@@ -1,211 +1,255 @@
-const audioPlayers = {}; // { uniqueKey: { hover: Tone.Player, click: Tone.Player } }
+// ===============================
+// Offgrid Studio Index — Main JS
+// Stable audio mapping + sorting/filtering-safe
+// ===============================
+
+const audioPlayers = {}; // { [stableId]: { hover: Tone.Player|null, click: Tone.Player|null } }
 let selectedCategories = [];
 let currentPlayer = null;
+// Track the currently playing voice so we can release + dispose nodes
+let currentVoice = null; // { player, ampEnv, filterEnv, nodesToDispose: [] }
+
+let currentSort = { column: null, direction: "asc" };
+let dataRows = [];     // [{ id, cells }]
+let filteredRows = []; // same shape as dataRows
 
 // Start Tone.js after first user gesture
-document.addEventListener("click", async () => {
-  if (Tone.context.state !== "running") {
-    await Tone.start();
-    console.log("🔊 Tone.js context started");
+document.addEventListener(
+  "click",
+  async () => {
+    if (Tone.context.state !== "running") {
+      await Tone.start();
+      console.log("🔊 Tone.js context started");
+    }
+  },
+  { once: true }
+);
+
+// ------------------------------
+// Column map — update once here
+// ------------------------------
+const COL = {
+  TITLE: 0,
+  CLIENT: 1,
+  DESC: 2,
+  YEAR: 3,
+  LOCATION: 4,
+  MP3_HOVER: 5,   // F
+  MP3_CLICK: 6,   // G
+  GIF_PATH: 7,    // H
+  PROJECT_URL: 8, // I
+  LOCATION_URL: 9,// J
+  TAGS: 10        // K  (⚠️ If your tags are actually in I, set TAGS: 8 and shift others accordingly)
+};
+
+// ------------------------------
+// Helpers
+// ------------------------------
+
+// 🔧 Where your GIFs live (adjust if needed)
+// ⚠️ Case-sensitive on most servers: your folder is "GIFS" (all caps)
+const GIF_BASE = "https://offgrid.studio"; // or "https://files.offgrid.studio"
+const GIF_DIR  = "/GIFS/";                 // default folder when the sheet has only a filename
+
+// Build a URL from a filename, relative path, or legacy /public_html path
+function formatGifURL(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  let s = raw.trim();
+
+  // Fix common "https//" or "http//" (missing colon)
+  if (/^https?\/\//i.test(s) && !/^https?:\/\//i.test(s)) {
+    s = s.replace(/^https?\/\//i, (m) =>
+      m.toLowerCase().startsWith("https") ? "https://" : "http://"
+    );
   }
-}, { once: true }); // only run once
 
-let currentSort = { column: null, direction: 'asc' };
-let dataRows = [];
-let filteredRows = []; // stores the currently filtered data
+  // Full URL? keep as-is
+  if (/^https?:\/\//i.test(s)) return s;
 
-/*GIF formats Column filename to full URL ---> where does it define the column?*/
-function formatGifURL(pathFromSheet) {
-  if (!pathFromSheet || typeof pathFromSheet !== "string") return null;
-  const relativePath = pathFromSheet.replace(/^\/?public_html/, '');
-  return "https://offgrid.studio" + relativePath;
+  // Protocol-relative
+  if (/^\/\//.test(s)) return "https:" + s;
+
+  // Strip anything up to and including 'public_html'
+  const phIdx = s.toLowerCase().indexOf("public_html");
+  if (phIdx >= 0) s = s.slice(phIdx + "public_html".length);
+
+  // Normalize slashes
+  s = s.replace(/\\/g, "/").replace(/\/{2,}/g, "/");
+  // Remove leading slashes for joining logic
+  const stripped = s.replace(/^\/+/, "");
+
+  // If it already includes a directory, use it as a site-root path.
+  // If it's just a bare filename, prepend GIF_DIR.
+  const hasDir = stripped.includes("/");
+  const path = hasDir
+    ? "/" + stripped
+    : (GIF_DIR.replace(/\/+$/, "") + "/" + stripped).replace(/\/{2,}/g, "/");
+
+  // Final absolute URL
+  return GIF_BASE.replace(/\/+$/, "") + path;
 }
-/*GIF*/
 
-/*AUDIO
- formats Column filename to full URL ---> where does it define the column?*/
 function formatAudioURL(filename) {
   if (!filename || typeof filename !== "string") return null;
   return "https://files.offgrid.studio/" + filename.trim();
 }
-/*AUDIO formats Column filename to full URL ---> where does it define the column?*
 
-
-/* ✅ TAG PARSER: cleanly extract tags, removing empty/invalid ones */
 function parseTags(tagString) {
   return (tagString || "")
     .split(";")
-    .map(t => t.trim())
-    .filter(t => !!t && t.toLowerCase() !== "location");
+    .map((t) => t.trim())
+    .filter((t) => !!t && t.toLowerCase() !== "location");
 }
 
-/*GOOGLE SHEET LOADED*/
+// ------------------------------
+// Preload audio using STABLE IDs
+// ------------------------------
+async function preloadAudioPlayers(rows) {
+  for (const { id, cells } of rows) {
+    const hoverUrl = formatAudioURL(cells[COL.MP3_HOVER]);
+    const clickUrl = formatAudioURL(cells[COL.MP3_CLICK]);
+
+    const hoverPlayer = hoverUrl
+      ? new Tone.Player({ url: hoverUrl, autostart: false }).toDestination()
+      : null;
+
+    const clickPlayer = clickUrl
+      ? new Tone.Player({ url: clickUrl, autostart: false }).toDestination()
+      : null;
+
+    audioPlayers[id] = { hover: hoverPlayer, click: clickPlayer };
+
+    // Tiny stagger to avoid hammering on mobile
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  console.log("✅ All audio preloaded");
+}
+
+// ------------------------------
+// Load rows from Google Sheets
+// ------------------------------
 async function loadCSV() {
-  const response = await fetch("https://docs.google.com/spreadsheets/d/164ps6mI666JLt-q4iVb0FMA5ztPykwRT4mOVAE_zbwE/export?format=csv&gid=11925201");
+  const response = await fetch(
+    "https://docs.google.com/spreadsheets/d/164ps6mI666JLt-q4iVb0FMA5ztPykwRT4mOVAE_zbwE/export?format=csv&gid=11925201"
+  );
   const csvText = await response.text();
-  const rows = csvText.trim().split("\n").map(row => row.split(","));
+
+  // ⚠️ If your data contains commas inside cells, consider using a CSV parser (PapaParse).
+  const rows = csvText.trim().split(/\r?\n/).map((row) => row.split(","));
 
   const thead = document.querySelector("#sheetTable thead");
-  const tbody = document.querySelector("#sheetTable tbody");
 
-  const headers = rows[0];
-  dataRows = rows.slice(1); // ✅ keep it as arrays(⚠️LEAVES OUT FIRST ROW)
+  // ---- Build dataRows with stable ids
+  dataRows = rows.slice(1).map((cells) => {
+    const hover = (cells[COL.MP3_HOVER] || "").trim();
+    const click = (cells[COL.MP3_CLICK] || "").trim();
+    const id = [cells[COL.TITLE] || "", cells[COL.YEAR] || "", hover, click].join("||");
+    return { id, cells };
+  });
 
-  // === 🧠 Create table headers (skip columns F and beyond) ===
-  thead.innerHTML = ""; // clear old
+  // ---- Build table header (columns 0..4)
+  const headers = rows[0] || [];
+  thead.innerHTML = "";
   const trHead = document.createElement("tr");
   headers.forEach((header, index) => {
-    if (index > 4) return; // skip columns F onward
+    if (index > 4) return; // show only first five columns
     const th = document.createElement("th");
     th.dataset.index = index;
-    th.innerText = header;
-
-    if (index !== 4) {
-      th.addEventListener("click", () => sortByColumn(index));
-    }
-
+    th.textContent = header;
+    // Skip sorting on the LOCATION column if you like (matches your previous behavior)
+    if (index !== COL.LOCATION) th.addEventListener("click", () => sortByColumn(index));
     trHead.appendChild(th);
   });
   thead.appendChild(trHead);
 
-  // === 🔊 Preload audio ===
+  // ---- Preload audio (by stable id)
   await preloadAudioPlayers(dataRows);
 
-  // === 🗂 Sort by year (Column D = index 3), newest to oldest ===   ⚠️⚠️!only works when "clicktwice"
-  dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
-  filteredRows = dataRows.map((row, i) => ({ row, index: i })); // copy sorted data
+  // ---- Default sort: YEAR desc
+  dataRows.sort(
+    (a, b) => parseInt(b.cells[COL.YEAR] || "0", 10) - parseInt(a.cells[COL.YEAR] || "0", 10)
+  );
+  filteredRows = dataRows.slice();
 
-  // Set visual indicator on sorted column
-  const ths = document.querySelectorAll("thead th");
-  currentSort = { column: 3, direction: 'desc' };
-  ths.forEach(th => {
+  // ---- Set sort indicator
+  const ths = document.querySelectorAll("#sheetTable thead th");
+  currentSort = { column: COL.YEAR, direction: "desc" };
+  ths.forEach((th) => {
     th.classList.remove("sorted", "sorted-desc");
-    if (parseInt(th.dataset.index) === 3) {
+    if (parseInt(th.dataset.index, 10) === COL.YEAR) {
       th.classList.add("sorted", "sorted-desc");
     }
   });
 
-  // === 🧪 Render categories AFTER dataRows is set ===
+  // ---- Make category bar sticky once
+  const catBar = document.getElementById("categoryFilters");
+  if (catBar) catBar.classList.add("sticky-category-bar");
+
+  // ---- Initial render
   renderCategoryPills();
-
-  // === 📋 Render initial table view ===
   renderTable(filteredRows);
 
-  // === 🧼 Hide grid view initially ===
+  // ---- Hide grid initially
   const gridWrapper = document.getElementById("gridWrapper");
   const gridView = document.getElementById("gridView");
-  gridWrapper.classList.add("hidden");
-  gridView.innerHTML = "";
-
-  // === 🔧 Update sticky header offset ===
-  updateStickyHeaderOffset();
-}
-/*GOOGLE SHEET LOADED*/
-
-/*Audio: preload Audio Player🔊🔊🔊🔊🔊🔊🔊🔊 ROWS 6F7G*/ 
-async function preloadAudioPlayers(rows) {
-  for (let index = 0; index < rows.length; index++) {
-    const row = rows[index];
-    const hoverUrl = formatAudioURL(row[5]);
-    const clickUrl = formatAudioURL(row[6]);
-    const key = `row${index}`;
-
-    const hoverPlayer = hoverUrl ? new Tone.Player({ url: hoverUrl, autostart: false }).toDestination() : null;
-    const clickPlayer = clickUrl ? new Tone.Player({ url: clickUrl, autostart: false }).toDestination() : null;
-
-    audioPlayers[key] = { hover: hoverPlayer, click: clickPlayer };
-
-    await new Promise(r => setTimeout(r, 10));
+  if (gridWrapper && gridView) {
+    gridWrapper.classList.add("hidden");
+    gridView.innerHTML = "";
   }
 
-  console.log("✅ All audio preloaded");
-}
-/*Audio: preload Audio Player*/
-
-
-// CATEG
-document.getElementById("categoryFilters").classList.add("sticky-category-bar");
-renderCategoryPills(); // ✅ moved down to after dataRows
-// CATEG
-  
-/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED           ⚠️⚠️--> EXISTSTWICE⚠️⚠️*/
- // Sort dataRows by year (Column D = index 3), newest to oldest
-dataRows.sort((a, b) => parseInt(b[3], 10) - parseInt(a[3], 10));
-filteredRows = [...dataRows]; // copy sorted
-
-// Set initial sort indicator for Column D
-currentSort = { column: 3, direction: 'desc' };
-const ths = document.querySelectorAll("thead th");
-ths.forEach(th => {
-  th.classList.remove("sorted", "sorted-desc");
-  if (parseInt(th.dataset.index) === 3) {
-    th.classList.add("sorted", "sorted-desc");
-  }
-});
-/*THIS IS HOW THE TABLE(LIST) IS SORTED WHEN LOADED*/
-  
-  
- /*!!HOW WILL TABLE(LIST) BE RENDERED!!*/ 
-  // Sticky header offset
   updateStickyHeaderOffset();
+}
 
-  // ✅ Render only the table initially with filtered data
-  renderTable(filteredRows);
-
-  // ✅ Ensure grid is hidden and cleared
-  const gridWrapper = document.getElementById("gridWrapper");
-  const gridView = document.getElementById("gridView");
-  gridWrapper.classList.add("hidden");
-  gridView.innerHTML = "";
- /*HOW WILL TABLE(LIST) BE RENDERED*/ 
-
-/*!!TABLE(LIST) IS BEING "RENDERED"!! ---> SHEET: COLUMNS FOR GIF🌠🌠🌠🌠🌠 GIF_ROW 8H
-*/
-function renderTable(rowsWithIndex) {
+// ------------------------------
+// Table rendering (list view)
+// ------------------------------
+function renderTable(rowObjs) {
   const tbody = document.querySelector("#sheetTable tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
-  rowsWithIndex.forEach(({ row: cells, index: i }) => {
+  rowObjs.forEach(({ id, cells }) => {
     const tr = document.createElement("tr");
-    const rawGifPath = cells[7];
+
+    // Image preview URL
+    const rawGifPath = cells[COL.GIF_PATH];
     const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
     tr.dataset.previewImage = formattedUrl;
 
-    const tags = parseTags(cells[8]);
-    const rowKey = `row${i}`;
-    const hoverUrl = formatAudioURL(cells[5]);
-    const clickUrl = formatAudioURL(cells[6]);
+    const tags = parseTags(cells[COL.TAGS]);
 
-    // Audio preload fallback
-    if (!audioPlayers[rowKey]) audioPlayers[rowKey] = {};
-    if (hoverUrl && !audioPlayers[rowKey].hover) {
-      audioPlayers[rowKey].hover = new Tone.Player(hoverUrl).toDestination();
-      audioPlayers[rowKey].hover.autostart = false;
-    }
-    if (clickUrl && !audioPlayers[rowKey].click) {
-      audioPlayers[rowKey].click = new Tone.Player(clickUrl).toDestination();
-      audioPlayers[rowKey].click.autostart = false;
-    }
+    // Ensure players exist even if preload missed something (rare)
+    if (!audioPlayers[id]) audioPlayers[id] = {};
+    const hoverUrl = formatAudioURL(cells[COL.MP3_HOVER]);
+    const clickUrl = formatAudioURL(cells[COL.MP3_CLICK]);
+    if (hoverUrl && !audioPlayers[id].hover)
+      audioPlayers[id].hover = new Tone.Player({ url: hoverUrl, autostart: false }).toDestination();
+    if (clickUrl && !audioPlayers[id].click)
+      audioPlayers[id].click = new Tone.Player({ url: clickUrl, autostart: false }).toDestination();
 
-    attachHoverAndClickAudio(tr, rowKey, tags);
+    // Hook audio to row
+    attachHoverAndClickAudio(tr, id, tags);
 
-    const url = cells[8];     // LINK2PROJECT❓
-    if (url) {
+    // Row click → open project URL (unless clicking the location pill)
+    const projectUrl = cells[COL.PROJECT_URL];
+    if (projectUrl) {
       tr.style.cursor = "pointer";
       tr.addEventListener("click", (e) => {
         if (e.target.closest(".location")) return;
-        window.open(url, "_blank", "noopener,noreferrer");
+        window.open(projectUrl, "_blank", "noopener,noreferrer");
       });
     }
 
+    // Tags for pill highlighting
     tr.dataset.tags = JSON.stringify(tags);
     tr.addEventListener("mouseenter", () => highlightPills(tags));
     tr.addEventListener("mouseleave", resetPills);
 
-    // Image preview
+    // Image preview (requires #imagePreview and #previewContent in DOM)
     tr.addEventListener("mouseenter", () => {
       const preview = document.getElementById("imagePreview");
       const content = document.getElementById("previewContent");
+      if (!preview || !content) return;
       content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
       preview.classList.remove("active");
       void preview.offsetWidth;
@@ -215,6 +259,7 @@ function renderTable(rowsWithIndex) {
 
     tr.addEventListener("mousemove", (e) => {
       const preview = document.getElementById("imagePreview");
+      if (!preview) return;
       preview.style.left = `${e.pageX + 20}px`;
       preview.style.top = `${e.pageY - 20}px`;
     });
@@ -222,6 +267,7 @@ function renderTable(rowsWithIndex) {
     tr.addEventListener("mouseleave", () => {
       const preview = document.getElementById("imagePreview");
       const content = document.getElementById("previewContent");
+      if (!preview || !content) return;
       preview.hideTimer = setTimeout(() => {
         preview.classList.remove("active");
         setTimeout(() => {
@@ -230,17 +276,17 @@ function renderTable(rowsWithIndex) {
       }, 50);
     });
 
-    // Cells: only show first 5 (index 0-4)
-    cells.forEach((cell, index) => {
-      if (index > 4) return;
+    // Cells: render first 5 columns (0..4)
+    for (let index = 0; index <= 4; index++) {
+      const cell = cells[index] || "";
       const td = document.createElement("td");
-   // Cells: only show first 5 (index 0-4)📍📍📍📍📍📍📍📍📍📍LOCATION 10J
+
+      // Special handling for LOCATION column (index 1 in your earlier logic; adjust if needed)
       if (index === 1 && cell.includes("@")) {
-        const locationUrl = cells[9];  // 📍📍📍📍📍📍📍📍📍📍LOCATION 10J
+        const locationUrl = cells[COL.LOCATION_URL];
         const pill = document.createElement("span");
         pill.className = "location";
         pill.textContent = `${cell} 📍`;
-
         if (locationUrl && locationUrl.startsWith("http")) {
           const link = document.createElement("a");
           link.href = locationUrl;
@@ -252,7 +298,7 @@ function renderTable(rowsWithIndex) {
         } else {
           td.appendChild(pill);
         }
-      } else if (cell.toLowerCase().includes("places")) {
+      } else if (typeof cell === "string" && cell.toLowerCase().includes("places")) {
         const pill = document.createElement("span");
         pill.className = "pill";
         pill.textContent = cell;
@@ -262,7 +308,7 @@ function renderTable(rowsWithIndex) {
       }
 
       tr.appendChild(td);
-    });
+    }
 
     // GSAP row hover
     tr.addEventListener("mouseenter", () => {
@@ -286,20 +332,33 @@ function renderTable(rowsWithIndex) {
     tbody.appendChild(tr);
   });
 }
-/*GIF PREVIEW ON HOVER*/
 
-
-/*Audio Envelope*/
+// ------------------------------
+// Audio envelope + FX  (Option A integrated)
+// ------------------------------
 async function playShapedAudio(player, tags = []) {
-  console.log("🎯 Tags received:", tags);
-  if (!player || !player.buffer.loaded) {
+  // If not loaded yet, retry once it's ready
+  if (!player || !player.buffer || !player.buffer.loaded) {
+    if (player && !player._retryHooked) {
+      player._retryHooked = true;
+      player.onload = () => playShapedAudio(player, tags);
+    }
     console.warn("⚠️ No player or not loaded");
     return;
   }
 
-  if (currentPlayer) {
-    currentPlayer.stop();
-    currentPlayer.disconnect();
+  // Release + dispose previous voice (if any)
+  if (currentVoice) {
+    try {
+      currentVoice.ampEnv?.triggerRelease();
+      currentVoice.filterEnv?.triggerRelease();
+      currentVoice.player?.stop();
+      // dispose previous nodes we created
+      currentVoice.nodesToDispose?.forEach(n => {
+        try { n.dispose?.(); } catch (_) {}
+      });
+    } catch (_) {}
+    currentVoice = null;
   }
 
   const now = Tone.now();
@@ -309,44 +368,29 @@ async function playShapedAudio(player, tags = []) {
   const release = Math.random() * 0.3 + 0.005;
   const cutoff = Math.random() * 12000 + 50;
 
-  console.log(`🎛️ Attack: ${attack.toFixed(2)}s | Decay: ${decay.toFixed(2)}s | Sustain: ${sustain.toFixed(2)} | Release: ${release.toFixed(2)}s`);
-  console.log(`🎚️ Filter cutoff: ${Math.round(cutoff)} Hz`);
-
+  // Core voice nodes
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
-  const gainNode = new Tone.Gain(0);
+  const gainNode = new Tone.Gain(0); // will be driven by amp envelope
 
   const effectsChain = [];
 
-  // 🎯 Tag matching helper
-  const tagMatch = (needles) => {
-    return Array.isArray(tags) && tags.some(tag =>
-      needles.some(needle =>
-        tag.trim().toLowerCase() === needle.trim().toLowerCase()
-      )
-    );
-  };
+  // Tag helper
+  const tagMatch = (needles) =>
+    Array.isArray(tags) &&
+    tags.some((tag) => needles.some((n) => tag.trim().toLowerCase() === n.trim().toLowerCase()));
 
-  // === 🎛 FX MATCHES ===
+  // FX matches
   if (tagMatch(["Octaphonic", "Quadrophonic"])) {
-    console.log("🌐 Auto-panner activated");
     const startFreq = Math.random() * 25 + 25;
     const endFreq = 0.1;
     const rampTime = 2;
-
-    const panner = new Tone.AutoPanner({
-      frequency: startFreq,
-      depth: 1,
-      type: "sine"
-    }).start();
-
+    const panner = new Tone.AutoPanner({ frequency: startFreq, depth: 1, type: "sine" }).start();
     panner.frequency.setValueAtTime(startFreq, now);
     panner.frequency.exponentialRampToValueAtTime(endFreq, now + rampTime);
     effectsChain.push(panner);
   }
 
   if (tagMatch(["Social Media", "Ad Campaign"])) {
-    console.log("🎧 Chorus + animated delay");
-
     const highDepth = Math.random() * 0.5 + 0.5;
     const lowDepth = Math.random() * 0.3 + 0.1;
     const rampTime = Math.random() * 1.5 + 0.5;
@@ -372,7 +416,6 @@ async function playShapedAudio(player, tags = []) {
 
     const startDelay = Math.random() * 0.4 + 0.1;
     const endDelay = Math.random() * 0.04 + 0.01;
-
     delay.delayTime.setValueAtTime(startDelay, now);
     delay.delayTime.exponentialRampToValueAtTime(endDelay, now + rampTime);
 
@@ -380,31 +423,27 @@ async function playShapedAudio(player, tags = []) {
     effectsChain.push(chorus, delay);
   }
 
-  // === Fallback if nothing matched ===
+  // Fallback FX
   if (effectsChain.length === 0) {
-    console.log("🎲 No matching FX — using fallback");
-    const useReverb = Math.random() < 0.5;
-
-    if (useReverb) {
-      console.log("🧼 Using reverb");
+    if (Math.random() < 0.5) {
       const reverb = new Tone.Reverb({ decay: 1.5, preDelay: 0.01 });
       reverb.wet.value = 0.3;
       await reverb.generate();
       effectsChain.push(reverb);
     } else {
-      console.log("🔁 Using delay");
       const delay = new Tone.FeedbackDelay("16n", 0.3);
       delay.wet.value = 0.1;
       effectsChain.push(delay);
     }
   }
 
-  // 🔗 Chain all FX together
+  // Chain FX
   for (let i = 0; i < effectsChain.length - 1; i++) {
     effectsChain[i].connect(effectsChain[i + 1]);
   }
   const fx = effectsChain[effectsChain.length - 1];
 
+  // Connect graph: player -> filter -> gain -> fx -> destination
   gainNode.connect(fx);
   fx.toDestination();
 
@@ -412,45 +451,74 @@ async function playShapedAudio(player, tags = []) {
   player.connect(filter);
   filter.connect(gainNode);
 
-  // Envelope
-  gainNode.gain.setValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(1, now + attack);
-  gainNode.gain.linearRampToValueAtTime(sustain, now + attack + decay);
-  gainNode.gain.linearRampToValueAtTime(0, now + player.buffer.duration - release);
+  // ===== Envelopes (Option A) =====
+  // Amplitude envelope → controls gain
+  const ampEnv = new Tone.Envelope({ attack, decay, sustain, release });
+  ampEnv.connect(gainNode.gain);
 
+  // Filter envelope → sweeps cutoff over time (in octaves above baseFrequency)
+  const filterEnv = new Tone.FrequencyEnvelope({
+    attack: Math.max(0.01, attack * 0.6),
+    decay,
+    sustain: Math.min(0.8, sustain + 0.2),
+    release,
+    baseFrequency: Math.max(50, cutoff * 0.4),
+    octaves: 3
+  });
+  filterEnv.connect(filter.frequency);
+
+  // Trigger envelopes + playback
+  ampEnv.triggerAttack(now);
+  filterEnv.triggerAttack(now);
   player.start(now);
+
+  // Schedule releases slightly before sample end
+  const end = now + player.buffer.duration;
+  ampEnv.triggerRelease(end - release);
+  filterEnv.triggerRelease(end - release);
+  player.stop(end + 0.05);
+
+  // Save refs so we can release/dispose next time
+  currentVoice = {
+    player,
+    ampEnv,
+    filterEnv,
+    nodesToDispose: [filter, gainNode, ...effectsChain, ampEnv, filterEnv]
+  };
   currentPlayer = player;
 }
-/*Audio Envelope*/
 
-/*Audio MouseOver + Click*/
-function attachHoverAndClickAudio(el, rowKey, tags) {
+// ------------------------------
+// Hover + Click audio binding
+// ------------------------------
+function attachHoverAndClickAudio(el, stableId, tags) {
   el.addEventListener("mouseenter", () => {
-    const player = audioPlayers[rowKey]?.hover;
+    const player = audioPlayers[stableId]?.hover;
     if (player) playShapedAudio(player, tags);
   });
 
   el.addEventListener("click", () => {
-    const player = audioPlayers[rowKey]?.click;
+    const player = audioPlayers[stableId]?.click;
     if (player) playShapedAudio(player, tags);
   });
 }
-/*Audio MouseOver + Click*/
 
-/*!!RENDER GRID!!*/
-function renderGridView(rowsWithIndex) {
+// ------------------------------
+// Grid rendering (card view)
+// ------------------------------
+function renderGridView(rowObjs) {
   const grid = document.getElementById("gridView");
+  if (!grid) return;
   grid.innerHTML = "";
-  // GRID COLUMNS ❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️
-  rowsWithIndex.forEach(({ row: cells, index: i }) => {
-    const gifUrl = formatGifURL(cells[7]);     // Column 8H = GIF preview path
-    const projectTitle = cells[0];             // Column A = title
-    const year = cells[3];                     // Column D = year
-    const link = cells[8];                     // Column I9 = link
 
-    const tags = parseTags(cells[10]);          // Column 11K = categories
+  rowObjs.forEach(({ id, cells }, i) => {
+    const gifUrl = formatGifURL(cells[COL.GIF_PATH]) || "https://via.placeholder.com/150";
+    const projectTitle = cells[COL.TITLE] || "";
+    const year = cells[COL.YEAR] || "";
+    const link = cells[COL.PROJECT_URL];
+    const tags = parseTags(cells[COL.TAGS]);
 
-    const card = document.createElement("div"); 
+    const card = document.createElement("div");
     card.className = "grid-card animated";
     card.style.animationDelay = `${i * 10}ms`;
     card.dataset.tags = JSON.stringify(tags);
@@ -469,18 +537,14 @@ function renderGridView(rowsWithIndex) {
       });
     }
 
-    // ✅ Pass tags to audio
-    const rowKey = `row${i}`;
-    attachHoverAndClickAudio(card, rowKey, tags); // Column P/R audio
-
+    attachHoverAndClickAudio(card, id, tags);
     grid.appendChild(card);
   });
 
-  // ✅ Delay to ensure DOM is fully rendered before applying GSAP
+  // GSAP hover
   requestAnimationFrame(() => {
-    document.querySelectorAll(".grid-card").forEach(card => {
+    document.querySelectorAll(".grid-card").forEach((card) => {
       card.addEventListener("mouseenter", () => {
-        console.log("hover in:", card); // ✅ LOG to confirm hover is working
         gsap.to(card, {
           scale: 1.5,
           y: -2,
@@ -492,7 +556,6 @@ function renderGridView(rowsWithIndex) {
       });
 
       card.addEventListener("mouseleave", () => {
-        console.log("hover out:", card); // ✅ LOG to confirm exit is working
         gsap.to(card, {
           scale: 1,
           y: 0,
@@ -505,153 +568,44 @@ function renderGridView(rowsWithIndex) {
     });
   });
 }
-/*!!RENDER GRID!!*/
-/*!!HIGHLIGHTPILLSTUFF!!*/
-function highlightPills(tags) {
-  const pills = document.querySelectorAll(".pill");
-  document.querySelectorAll(".pill[data-category]");
-  pills.forEach(pill => {
-    const category = pill.getAttribute("data-category");
-    if (tags.includes(category)) {
-      pill.style.transform = "scale(1.5)";
-      pill.style.margin = "0 12px";
-      pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
-    } else {
-      pill.style.transform = "scale(1)";
-      pill.style.margin = "0 6px";
-    }
-  });
-}
 
-function resetPills() {
-  const pills = document.querySelectorAll(".pill");
-  pills.forEach(pill => {
-    pill.style.transform = "scale(1)";
-    pill.style.margin = "0 8px";
-    pill.style.transition = "transform 0.2s ease, margin 0.2s ease"; // 🆕 Add this line
-  });
-}
-
-loadCSV();
-/*!!HIGHLIGHTPILLSTUFF!!*/
-/*!!RENDER GRID!!*/
-
-/*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
-function sortByColumn(index) {
-  const ths = document.querySelectorAll("thead th");
-
-  // Remove existing sort classes
-  ths.forEach(th => th.classList.remove("sorted", "sorted-desc"));
-
-  // Set sort direction
-  if (currentSort.column === index) {
-    currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
-  } else {
-    currentSort.column = index;
-    currentSort.direction = "asc";
-  }
-
-  const dir = currentSort.direction === "asc" ? 1 : -1;
-
-  const sorted = [...dataRows].sort((a, b) => {
-    const valA = a[index];
-    const valB = b[index];
-
-    const numA = parseFloat(valA);
-    const numB = parseFloat(valB);
-    const isNum = !isNaN(numA) && !isNaN(numB);
-
-    if (isNum) return (numA - numB) * dir;
-    return valA.localeCompare(valB) * dir;
-  });
-
-  // Add appropriate sort class
-  const activeTh = Array.from(ths).find(th => parseInt(th.dataset.index) === index);
-  if (activeTh) {
-    activeTh.classList.add("sorted");
-    if (currentSort.direction === "desc") {
-      activeTh.classList.add("sorted-desc");
-    }
-  }
-
-  renderTable(sorted.map((row, i) => ({ row, index: i })));
-}
-/*FUNCTION:------>CLICK ON Column to Sort*/
-
-
-//categories(?)
-/*SORT ITEMS IN DIFF WAYS: Can I move this after the table/grid render?*/
-
-/*TOGGLE BETWEEN TABLE(LIST)/GRID: Can I move this under SORT ITEMS(...) when that has moved up?*/
-const toggleBtn = document.getElementById("toggleView");
-
-toggleBtn.addEventListener("click", () => {
-  const sheetTable = document.getElementById("sheetTable");
-  const gridWrapper = document.getElementById("gridWrapper");
-
-  const isGridHidden = gridWrapper.classList.contains("hidden"); // ✅ Define this early
-
-  if (isGridHidden) {
-    // Show grid view
-    sheetTable.classList.add("hidden");
-    gridWrapper.classList.remove("hidden");
-    renderGridView(filteredRows);
-    toggleBtn.textContent = "VIEW: ✜";
-  } else {
-    // Show table view
-    gridWrapper.classList.add("hidden");
-
-    setTimeout(() => {
-      sheetTable.classList.remove("hidden");
-      sheetTable.classList.add("animated");
-      renderTable(filteredRows);
-
-      setTimeout(() => {
-        sheetTable.classList.remove("animated");
-      }, 300);
-    }, 300);
-
-    toggleBtn.textContent = "VIEW: ≡";
-  }
-});
-/*TOGGLE BETWEEN TABLE(LIST)/GRID: Can I move this under SORT ITEMS(...) when that has moved up?*/
-
-
-/*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
+// ------------------------------
+// Category pills (from COL.TAGS)
+// ------------------------------
 function renderCategoryPills() {
   const container = document.getElementById("categoryFilters");
   if (!container) return;
   container.innerHTML = "";
 
   const allCategories = new Set();
+  dataRows.forEach(({ cells }) => {
+    parseTags(cells[COL.TAGS]).forEach((cat) => allCategories.add(cat));
+  });
 
-  // Gather all unique categories from column K (index 11)🗂️🗂️🗂️🗂️🗂️🗂️🗂️ ROWS!!
-  dataRows.forEach(row => {
-  parseTags(row[11]).forEach(cat => allCategories.add(cat));
-});
-
-  // Create pill elements
-  [...allCategories].sort().forEach(cat => {
+  [...allCategories].sort().forEach((cat) => {
     const pill = document.createElement("span");
-pill.className = "pill";
-pill.textContent = cat;
-pill.setAttribute("data-category", cat); // ✅ Allows pill to be matched on hover
-    pill.style.margin = "4px";
-    pill.style.padding = "6px 10px";
-pill.style.minWidth = "80px"; // Add this to prevent size shifting
-pill.style.display = "inline-flex";
-pill.style.alignItems = "center";
-pill.style.justifyContent = "space-between";
-    pill.style.padding = "6px 10px";
-    pill.style.borderRadius = "999px";
-    pill.style.border = "1px solid #ccc";
-    pill.style.cursor = "pointer";
-    pill.style.backgroundColor = selectedCategories.includes(cat) ? "#fff" : "#000";
-    pill.style.color = selectedCategories.includes(cat) ? "#000" : "#fff";
+    pill.className = "pill";
+    pill.textContent = cat;
+    pill.setAttribute("data-category", cat); // used by highlightPills
+
+    // Inline styling (replace with CSS if you prefer)
+    Object.assign(pill.style, {
+      margin: "4px",
+      padding: "6px 10px",
+      minWidth: "80px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: "999px",
+      border: "1px solid #ccc",
+      cursor: "pointer",
+      backgroundColor: selectedCategories.includes(cat) ? "#fff" : "#000",
+      color: selectedCategories.includes(cat) ? "#000" : "#fff"
+    });
 
     pill.addEventListener("click", () => {
       if (selectedCategories.includes(cat)) {
-        selectedCategories = selectedCategories.filter(c => c !== cat);
+        selectedCategories = selectedCategories.filter((c) => c !== cat);
       } else {
         selectedCategories.push(cat);
       }
@@ -666,7 +620,7 @@ pill.style.justifyContent = "space-between";
       x.style.cursor = "pointer";
       x.addEventListener("click", (e) => {
         e.stopPropagation();
-        selectedCategories = selectedCategories.filter(c => c !== cat);
+        selectedCategories = selectedCategories.filter((c) => c !== cat);
         renderCategoryPills();
         filterByCategories();
       });
@@ -676,67 +630,167 @@ pill.style.justifyContent = "space-between";
     container.appendChild(pill);
   });
 
-  // Add "Clear All" button
+  // Clear All
   if (selectedCategories.length > 0) {
     const clearBtn = document.createElement("button");
-clearBtn.className = "clear-all-btn";
+    clearBtn.className = "clear-all-btn";
     clearBtn.textContent = "×";
-    clearBtn.style.marginLeft = "12px";
-    clearBtn.style.padding = "6px 12px";
-    clearBtn.style.borderRadius = "999px";
-    clearBtn.style.border = "1px solid #ccc";
-    clearBtn.style.background = "#444";
-    clearBtn.style.color = "white";
-    clearBtn.style.cursor = "pointer";
-
+    Object.assign(clearBtn.style, {
+      marginLeft: "12px",
+      padding: "6px 12px",
+      borderRadius: "999px",
+      border: "1px solid #ccc",
+      background: "#444",
+      color: "white",
+      cursor: "pointer"
+    });
     clearBtn.addEventListener("click", () => {
-    selectedCategories = [];
-    renderCategoryPills();
-    filterByCategories(); // ✅ Use this instead of renderTable(dataRows)
-  });
-
+      selectedCategories = [];
+      renderCategoryPills();
+      filterByCategories();
+    });
     container.appendChild(clearBtn);
   }
 }
-//filtersystem🗂️🗂️🗂️🗂️🗂️🗂️🗂️ ROWS!!
+
 function filterByCategories() {
-  filteredRows = selectedCategories.length === 0
-  ? dataRows.map((row, i) => ({ row, index: i }))
-  : dataRows
-      .map((row, i) => ({ row, index: i }))
-      .filter(({ row }) => {
-        const tags = parseTags(row[11]);
-        return selectedCategories.some(cat => tags.includes(cat));
-      });
+  filteredRows =
+    selectedCategories.length === 0
+      ? dataRows.slice()
+      : dataRows.filter(({ cells }) => {
+          const tags = parseTags(cells[COL.TAGS]);
+          return selectedCategories.some((cat) => tags.includes(cat));
+        });
 
   const sheetTable = document.getElementById("sheetTable");
   const gridWrapper = document.getElementById("gridWrapper");
 
-  if (gridWrapper.classList.contains("hidden")) {
-    sheetTable.classList.remove("hidden");
-    gridWrapper.classList.add("hidden");
+  if (gridWrapper && gridWrapper.classList.contains("hidden")) {
+    sheetTable?.classList.remove("hidden");
+    gridWrapper?.classList.add("hidden");
     renderTable(filteredRows);
   } else {
-    gridWrapper.classList.remove("hidden");
-    sheetTable.classList.add("hidden");
+    gridWrapper?.classList.remove("hidden");
+    sheetTable?.classList.add("hidden");
     renderGridView(filteredRows);
   }
 }
-//filtersystem
-/*CATEGORIES: Category function that uses COLUMN I to add categories to rows(items)*/
 
-/*STICKYHEADER: Adjust(?), move to sit right*/
+// ------------------------------
+// Sort handler
+// ------------------------------
+function sortByColumn(index) {
+  const ths = document.querySelectorAll("thead th");
+  ths.forEach((th) => th.classList.remove("sorted", "sorted-desc"));
+
+  if (currentSort.column === index) {
+    currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    currentSort.column = index;
+    currentSort.direction = "asc";
+  }
+  const dir = currentSort.direction === "asc" ? 1 : -1;
+
+  const sorted = [...dataRows].sort((a, b) => {
+    const valA = a.cells[index] ?? "";
+    const valB = b.cells[index] ?? "";
+    const numA = parseFloat(valA);
+    const numB = parseFloat(valB);
+    const isNum = !isNaN(numA) && !isNaN(numB);
+    return isNum ? (numA - numB) * dir : String(valA).localeCompare(String(valB)) * dir;
+  });
+
+  filteredRows = sorted;
+
+  const activeTh = Array.from(ths).find((th) => parseInt(th.dataset.index, 10) === index);
+  if (activeTh) {
+    activeTh.classList.add("sorted");
+    if (currentSort.direction === "desc") activeTh.classList.add("sorted-desc");
+  }
+
+  const gridWrapper = document.getElementById("gridWrapper");
+  if (gridWrapper && gridWrapper.classList.contains("hidden")) {
+    renderTable(filteredRows);
+  } else {
+    renderGridView(filteredRows);
+  }
+}
+
+// ------------------------------
+// Highlight pills while hovering
+// ------------------------------
+function highlightPills(tags) {
+  const pills = document.querySelectorAll(".pill");
+  pills.forEach((pill) => {
+    const category = pill.getAttribute("data-category");
+    if (category && tags.includes(category)) {
+      pill.style.transform = "scale(1.5)";
+      pill.style.margin = "0 12px";
+      pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
+    } else {
+      pill.style.transform = "scale(1)";
+      pill.style.margin = "0 6px";
+    }
+  });
+}
+
+function resetPills() {
+  const pills = document.querySelectorAll(".pill");
+  pills.forEach((pill) => {
+    pill.style.transform = "scale(1)";
+    pill.style.margin = "0 8px";
+    pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
+  });
+}
+
+// ------------------------------
+// Toggle list/grid
+// ------------------------------
+const toggleBtn = document.getElementById("toggleView");
+if (toggleBtn) {
+  toggleBtn.addEventListener("click", () => {
+    const sheetTable = document.getElementById("sheetTable");
+    const gridWrapper = document.getElementById("gridWrapper");
+    const isGridHidden = gridWrapper?.classList.contains("hidden");
+
+    if (isGridHidden) {
+      // Show grid
+      sheetTable?.classList.add("hidden");
+      gridWrapper?.classList.remove("hidden");
+      renderGridView(filteredRows);
+      toggleBtn.textContent = "VIEW: ✜";
+    } else {
+      // Show table
+      gridWrapper?.classList.add("hidden");
+      setTimeout(() => {
+        sheetTable?.classList.remove("hidden");
+        sheetTable?.classList.add("animated");
+        renderTable(filteredRows);
+        setTimeout(() => sheetTable?.classList.remove("animated"), 300);
+      }, 300);
+      toggleBtn.textContent = "VIEW: ≡";
+    }
+  });
+}
+
+// ------------------------------
+// Sticky header offset
+// ------------------------------
 function updateStickyHeaderOffset() {
   const categoryBar = document.getElementById("categoryFilters");
   const tableHeaders = document.querySelectorAll("#sheetTable thead th");
 
   if (categoryBar && tableHeaders.length > 0) {
     const offset = categoryBar.offsetHeight + "-1px";
-    tableHeaders.forEach(th => {
+    tableHeaders.forEach((th) => {
       th.style.top = offset;
     });
   }
 }
 window.addEventListener("load", updateStickyHeaderOffset);
 window.addEventListener("resize", updateStickyHeaderOffset);
-/*STICKYHEADER: Adjust(?), move to sit right*/
+
+// ------------------------------
+// GO!
+// ------------------------------
+loadCSV();
