@@ -362,11 +362,11 @@ async function playShapedAudio(player, tags = []) {
   }
 
   const now = Tone.now();
-  const attack = Math.random() * 0.3 + 0.1;
-  const decay = Math.random() * 0.2 + 0.05;
-  const sustain = Math.random() * 0.1 + 0.01;
-  const release = Math.random() * 0.3 + 0.005;
-  const cutoff = Math.random() * 12000 + 50;
+  const attack = Math.random() * 0.2 + 0.0075;
+  const decay = Math.random() * 2 + 1;
+  const sustain = Math.random() * 0;
+  const release = Math.random() * 0.2 + 0.05;
+  const cutoff = Math.random() * 20000 + 15000;
 
   // Core voice nodes
   const filter = new Tone.Filter({ type: "lowpass", frequency: cutoff });
