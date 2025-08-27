@@ -9,34 +9,54 @@ body {
   padding: 0;
 }
 
-#sheetTable {
-  width: 100%;
+#TitleHeader {
+  height: 2.5em;
+  width: 90%;
+  margin-left: 5%;
+  margin-right: 5%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
   background-color: #000;
   color: #fff;
   text-align: left;
-  table-layout: auto;
+  top: 0;
+  position: sticky;
+  z-index: 10;
 }
 
-/* give space to last column */
-#sheetTable td:nth-child(4),
-#sheetTable th:nth-child(4) {
-  width: 60px; /* or whatever narrow width you prefer */
-  white-space: nowrap; /* prevents line breaks like '2025' wrapping */
-  text-align: center;   /* optional: center-align year */
+/* Make TitleHeader cells match sheetTable cells exactly */
+#TitleHeader th {
+  padding: 0; /* Same as sheetTable td */
+  border-bottom: 0.5px solid #eee;
+  min-width: 100px;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  vertical-align: middle;
+  line-height: 1.2;
+  font-weight: normal;
 }
 
-#sheetTable td:last-child,
-#sheetTable th:last-child {
-  width: auto;
-}
+#TitleHeader th:nth-child(1) { width: 10%; } /* Agency */
+#TitleHeader th:nth-child(2) { width: 20%; } /* Client */
+#TitleHeader th:nth-child(3) { width: 25%; } /* Project */
+#TitleHeader th:nth-child(4) { width: 7.5%; } /* Year */
+#TitleHeader th:nth-child(5) { width: 35%; } /* Services */
 
-/* Sticky header row (below pills) */
-/* (NOTE: These li styles appear unused—likely a leftover. If not used, you can remove them.) */
-#sheetTable li {
-  transition: transform 0.15s ease;
-  transform-origin: center center;
+#sheetTable td:nth-child(1) { width: 10%; } /* Agency */
+#sheetTable td:nth-child(2) { width: 20%; } /* Client */
+#sheetTable td:nth-child(3) { width: 25%; } /* Project */
+#sheetTable td:nth-child(4) { width: 7.5%; } /* Year */
+#sheetTable td:nth-child(5) { width: 35%; } /* Services */
+
+#sheetTable{
+  width: 90%;
+  margin-left: 5%;
+  margin-right: 5%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background-color: #000;
+  color: #fff;
+  text-align: left;
 }
 
 #sheetTable li:hover {
@@ -56,7 +76,7 @@ body {
 
 /* Table row styling */
 #sheetTable tbody tr {
-  height: 3.5em; /* enough for 2 lines of text */
+  height: 3em; /* enough for 2 lines of text */
   overflow: hidden;
   background-color: #000;
   transition: background-color 0.2s ease;
@@ -189,16 +209,6 @@ th.sorted-desc::after {
   padding: 5px;
 }
 
-/* Sticky header row (below pills) */
-#sheetTable thead th {
-  top: 0px; /* height of pills bar */
-  background-color: black;
-  z-index: 1;
-  position: sticky;
-  margin: 10px 14px;
-  padding: 10px 14px;
-  border: 20px;
-}
 
 .hidden {
   display: none;

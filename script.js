@@ -29,7 +29,7 @@ document.addEventListener(
 // Column map — update once here
 // ------------------------------
 const COL = {
-  TITLE: 0,
+  TITLE: 0, //HEADER
   CLIENT: 1,
   DESC: 2,
   YEAR: 3,
@@ -137,17 +137,17 @@ async function loadCSV() {
   // ⚠️ If your data contains commas inside cells, consider using a CSV parser (PapaParse).
   const rows = csvText.trim().split(/\r?\n/).map((row) => row.split(","));
 
-  const thead = document.querySelector("#sheetTable thead");
+  const thead = document.querySelector("#TitleHeader thead");
 
   // ---- Build dataRows with stable ids
   dataRows = rows.slice(1).map((cells) => {
-    const hover = (cells[COL.MP3_HOVER] || "").trim();
-    const click = (cells[COL.MP3_CLICK] || "").trim();
+    const hover = (cells[COL.MP3_HOVER] || "").trim(); //CREATES A UNIQUE ID - HAS NOTHING TO DO WITH MP3
+    const click = (cells[COL.MP3_CLICK] || "").trim(); //CREATES A UNIQUE ID - HAS NOTHING TO DO WITH MP3
     const id = [cells[COL.TITLE] || "", cells[COL.YEAR] || "", hover, click].join("||");
     return { id, cells };
   });
 
-  // ---- Build table header (columns 0..4)
+  // ---- Build table header (columns 0..4) ---> HEADER/TITLE
   const headers = rows[0] || [];
   thead.innerHTML = "";
   const trHead = document.createElement("tr");
@@ -172,7 +172,7 @@ async function loadCSV() {
   filteredRows = dataRows.slice();
 
   // ---- Set sort indicator
-  const ths = document.querySelectorAll("#sheetTable thead th");
+  const ths = document.querySelectorAll("#TitleHeader thead th");
   currentSort = { column: COL.YEAR, direction: "desc" };
   ths.forEach((th) => {
     th.classList.remove("sorted", "sorted-desc");
@@ -652,7 +652,7 @@ function renderCategoryPills() {
     container.appendChild(clearBtn);
   }
 }
-
+  // !! HEADER
 function filterByCategories() {
   filteredRows =
     selectedCategories.length === 0
@@ -772,24 +772,6 @@ if (toggleBtn) {
     }
   });
 }
-
-// ------------------------------
-// Sticky header offset
-// ------------------------------
-function updateStickyHeaderOffset() {
-  const categoryBar = document.getElementById("categoryFilters");
-  const tableHeaders = document.querySelectorAll("#sheetTable thead th");
-
-  if (categoryBar && tableHeaders.length > 0) {
-    const offset = categoryBar.offsetHeight + "-1px";
-    tableHeaders.forEach((th) => {
-      th.style.top = offset;
-    });
-  }
-}
-window.addEventListener("load", updateStickyHeaderOffset);
-window.addEventListener("resize", updateStickyHeaderOffset);
-
 // ------------------------------
 // GO!
 // ------------------------------
