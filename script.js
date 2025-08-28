@@ -589,19 +589,10 @@ function renderCategoryPills() {
     pill.setAttribute("data-category", cat); // used by highlightPills
 
     // Inline styling (replace with CSS if you prefer)
-    Object.assign(pill.style, {
-      margin: "4px",
-      padding: "6px 10px",
-      minWidth: "80px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      borderRadius: "999px",
-      border: "1px solid #ccc",
-      cursor: "pointer",
-      backgroundColor: selectedCategories.includes(cat) ? "#fff" : "#000",
-      color: selectedCategories.includes(cat) ? "#000" : "#fff"
-    });
+    pill.className = "pill";
+    if (selectedCategories.includes(cat)) {
+      pill.classList.add("selected");
+    }
 
     pill.addEventListener("click", () => {
       if (selectedCategories.includes(cat)) {
@@ -635,15 +626,6 @@ function renderCategoryPills() {
     const clearBtn = document.createElement("button");
     clearBtn.className = "clear-all-btn";
     clearBtn.textContent = "×";
-    Object.assign(clearBtn.style, {
-      marginLeft: "12px",
-      padding: "6px 12px",
-      borderRadius: "999px",
-      border: "1px solid #ccc",
-      background: "#444",
-      color: "white",
-      cursor: "pointer"
-    });
     clearBtn.addEventListener("click", () => {
       selectedCategories = [];
       renderCategoryPills();
@@ -724,12 +706,9 @@ function highlightPills(tags) {
   pills.forEach((pill) => {
     const category = pill.getAttribute("data-category");
     if (category && tags.includes(category)) {
-      pill.style.transform = "scale(1.5)";
-      pill.style.margin = "0 12px";
-      pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
+      pill.classList.add("highlighted");  // ← Add CSS class instead
     } else {
-      pill.style.transform = "scale(1)";
-      pill.style.margin = "0 6px";
+      pill.classList.remove("highlighted");
     }
   });
 }
@@ -737,37 +716,31 @@ function highlightPills(tags) {
 function resetPills() {
   const pills = document.querySelectorAll(".pill");
   pills.forEach((pill) => {
-    pill.style.transform = "scale(1)";
-    pill.style.margin = "0 8px";
-    pill.style.transition = "transform 0.2s ease, margin 0.2s ease";
+    pill.classList.remove("highlighted");  // ← Remove CSS class
   });
 }
 
 // ------------------------------
-// Toggle list/grid
+// Toggle list/grid + ANIMATION
 // ------------------------------
 const toggleBtn = document.getElementById("toggleView");
 if (toggleBtn) {
   toggleBtn.addEventListener("click", () => {
     const sheetTable = document.getElementById("sheetTable");
     const gridWrapper = document.getElementById("gridWrapper");
-    const isGridHidden = gridWrapper?.classList.contains("hidden");
+    const isGridHidden = gsap.getProperty(gridWrapper, "display") === "none";
 
     if (isGridHidden) {
       // Show grid
-      sheetTable?.classList.add("hidden");
-      gridWrapper?.classList.remove("hidden");
+      gsap.set(sheetTable, { display: "none" });
+      gsap.set(gridWrapper, { display: "block", opacity: 1 });
       renderGridView(filteredRows);
       toggleBtn.textContent = "VIEW: ✜";
     } else {
       // Show table
-      gridWrapper?.classList.add("hidden");
-      setTimeout(() => {
-        sheetTable?.classList.remove("hidden");
-        sheetTable?.classList.add("animated");
-        renderTable(filteredRows);
-        setTimeout(() => sheetTable?.classList.remove("animated"), 300);
-      }, 300);
+      gsap.set(gridWrapper, { display: "none" });
+      gsap.set(sheetTable, { display: "table", opacity: 1 });
+      renderTable(filteredRows);
       toggleBtn.textContent = "VIEW: ≡";
     }
   });

@@ -57,6 +57,7 @@ body {
   background-color: #000;
   color: #fff;
   text-align: left;
+  transform: translateY(0); /* Initial position for animations */
 }
 
 #sheetTable li:hover {
@@ -185,17 +186,80 @@ th.sorted-desc::after {
   justify-content: center;
 }
 
+/* Pill states */
 .pill {
-  transition: transform 0.2s ease, margin 0.2s ease, opacity 0.2s ease;
+  margin: 4px;
+  padding: 6px 10px;
+  min-width: 80px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
+  justify-content: space-between;
   border-radius: 999px;
   border: 1px solid #ccc;
   cursor: pointer;
-  background-color: black;
+  background-color: #000;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+/* Add hover effect */
+.pill:hover {
+  background-color: #333;
+  border-color: #fff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+/* Your existing highlighted state */
+.pill.highlighted {
+  transform: scale(1.5) translateX(6px);
+  background-color: #333;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+  z-index: 10;
+}
+
+/* Selected state */
+.pill.selected {
+  background-color: #fff;
+  color: #000;
+  padding: 12px 20px;
+}
+
+/* Hover effect for selected pills */
+.pill.selected:hover {
+  background-color: #f0f0f0;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Clear button */
+.clear-all-btn {
+  margin-left: 12px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #444;
   color: white;
+  cursor: pointer;
+  width: 40px;         /* ← Match the largest pill height (24px padding + content) */
+  height: 40px;        /* ← Match the largest pill height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: normal;
+  line-height: 1;
+  box-sizing: border-box;
+  align-self: center;
+}
+
+/* Hover to inverse: outlined circle with white X */
+.clear-all-btn:hover {
+  background-color: transparent;
+  color: #fff;
+  border: 1px solid #fff;
+  box-shadow: none;
 }
 
 
@@ -246,62 +310,6 @@ th.sorted-desc::after {
   color: #aaa;
   margin-top: 8px;
   transition: transform 0.5s ease;
-}
-
-/*CLEAR BUTTON FOR CATEGORY LOGIC*/
-.clear-all-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background-color: #fff;
-  color: #000;
-  font-weight: bold;
-  font-size: 16px;
-  border: none;
-  cursor: pointer;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 0 1px #ccc;
-  transition: all 0.3s ease;
-}
-
-/* Hover to inverse: outlined circle with white X */
-.clear-all-btn:hover {
-  background-color: transparent;
-  color: #fff;
-  border: 1px solid #fff;
-  box-shadow: none;
-}
-
-
-#sheetTable,
-#gridWrapper {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-#sheetTable.hidden,
-#gridWrapper.hidden {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-#sheetTable.animated {
-  animation: fadeUpTable 0.3s ease forwards;
-}
-
-@keyframes fadeUpTable {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 #toggleView{
