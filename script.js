@@ -541,29 +541,100 @@ function renderGridView(rowObjs) {
     grid.appendChild(card);
   });
 
-  // GSAP hover
+  // GSAP hover with space creation + fisheye effect ⚠️⚠️⚠️⚠️⚠️ WORKS NICELY --- ADJUST! 
   requestAnimationFrame(() => {
     document.querySelectorAll(".grid-card").forEach((card) => {
       card.addEventListener("mouseenter", () => {
+        // Get all other cards
+        const allCards = document.querySelectorAll(".grid-card");
+        const otherCards = Array.from(allCards).filter(c => c !== card);
+        
+        // Animate the hovered card with fisheye effect
         gsap.to(card, {
-          scale: 1.5,
+          scale: 1.625,
           y: -2,
           duration: 0.5,
           ease: "power4.out",
           overwrite: "auto"
         });
+        
+        // Add fisheye distortion to hovered card
+        gsap.to(card, {
+          filter: "blur(0.5px) brightness(1.1) contrast(1)",
+          duration: 0.3,
+          ease: "power2.out"
+        });
+        
         card.style.zIndex = "10";
+        
+        // Animate other cards to shrink and move away
+        otherCards.forEach((otherCard, index) => {
+          // Calculate distance and direction from hovered card
+          const cardRect = card.getBoundingClientRect();
+          const otherRect = otherCard.getBoundingClientRect();
+          
+          // Get center points
+          const cardCenterX = cardRect.left + cardRect.width / 2;
+          const cardCenterY = cardRect.top + cardRect.height / 2;
+          const otherCenterX = otherRect.left + otherRect.width / 2;
+          const otherCenterY = otherRect.top + otherRect.height / 2;
+          
+          // Calculate direction vector
+          const deltaX = otherCenterX - cardCenterX;
+          const deltaY = otherCenterY - cardCenterY;
+          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          
+          // Normalize and scale the movement
+          const moveDistance = 75; // How far cards move away
+          const moveX = (deltaX / distance) * moveDistance;
+          const moveY = (deltaY / distance) * moveDistance;
+          
+          // Stagger the animation based on distance
+          const staggerDelay = Math.min(distance / 200, 0.3);
+          
+          // Add fisheye distortion to other cards (more blur for distant ones)
+          const blurAmount = Math.min(distance / 200, 0.125); // More blur for distant cards
+          
+          gsap.to(otherCard, {
+            scale: 0.9,
+            x: moveX,
+            y: moveY,
+            opacity: 1,
+            filter: `blur(${blurAmount}px) brightness(1)`,
+            duration: 1,
+            delay: staggerDelay * 0.2,
+            ease: "power2.out",
+            overwrite: "auto"
+          });
+        });
       });
 
       card.addEventListener("mouseleave", () => {
+        // Reset hovered card
         gsap.to(card, {
           scale: 1,
           y: 0,
-          duration: 1,
+          filter: "blur(0px) brightness(1) contrast(1)",
+          duration: 0.5,
           ease: "circ.out",
           overwrite: "auto"
         });
         card.style.zIndex = "1";
+        
+        // Reset all other cards
+        const allCards = document.querySelectorAll(".grid-card");
+        allCards.forEach((otherCard) => {
+          gsap.to(otherCard, {
+            scale: 1,
+            x: 0,
+            y: 0,
+            opacity: 1,
+            filter: "blur(0px) brightness(1)",
+            duration: 0.8,
+            ease: "power2.out",
+            overwrite: "auto"
+          });
+        });
       });
     });
   });
@@ -728,23 +799,187 @@ if (toggleBtn) {
   toggleBtn.addEventListener("click", () => {
     const sheetTable = document.getElementById("sheetTable");
     const gridWrapper = document.getElementById("gridWrapper");
-    const isGridHidden = gsap.getProperty(gridWrapper, "display") === "none";
+    const isGridHidden = gridWrapper.classList.contains("hidden");
+
+    // Prevent multiple clicks during animation
+    if (toggleBtn.dataset.animating === "true") return;
+    toggleBtn.dataset.animating = "true";
 
     if (isGridHidden) {
-      // Show grid
-      gsap.set(sheetTable, { display: "none" });
-      gsap.set(gridWrapper, { display: "block", opacity: 1 });
-      renderGridView(filteredRows);
-      toggleBtn.textContent = "VIEW: ✜";
+      // Switch to GRID view
+      animateToGridView(sheetTable, gridWrapper, toggleBtn);
     } else {
-      // Show table
-      gsap.set(gridWrapper, { display: "none" });
-      gsap.set(sheetTable, { display: "table", opacity: 1 });
-      renderTable(filteredRows);
-      toggleBtn.textContent = "VIEW: ≡";
+      // Switch to TABLE view  
+      animateToTableView(sheetTable, gridWrapper, toggleBtn);
     }
   });
 }
+
+// Animate to Grid View
+function animateToGridView(sheetTable, gridWrapper, toggleBtn) {
+  // 1. Animate toggle button
+  gsap.to(toggleBtn, {
+    scale: 0.8,
+    duration: 0.2,
+    ease: "power2.in",
+    onComplete: () => {
+      toggleBtn.textContent = "VIEW: ✜";
+      gsap.to(toggleBtn, {
+        scale: 1.1,
+        duration: 0.3,
+        ease: "back.out(1.7)"
+      });
+    }
+  });
+
+  // 2. Fade out table with scale
+  gsap.to(sheetTable, {
+    opacity: 0,
+    scale: 0.95,
+    y: -1000,
+    duration: 0.7,
+    ease: "power2.inOut",
+    onComplete: () => {
+      gsap.set(sheetTable, { display: "none" });
+    }
+  });
+
+  // 3. Show grid wrapper and render content
+  gsap.set(gridWrapper, { display: "block", opacity: 0, scale: 0.9 });
+  renderGridView(filteredRows);
+  
+  // 4. Fade in grid wrapper
+  gsap.to(gridWrapper, {
+    opacity: 1,
+    scale: 1,
+    duration: 1.5,
+    ease: "power2.out",
+    delay: 0.5,
+    onComplete: () => {
+      gridWrapper.classList.remove("hidden");
+      toggleBtn.dataset.animating = "false";
+    }
+  });
+
+  // 5. Stagger animate grid cards in batches
+  requestAnimationFrame(() => {
+    const allGridCards = document.querySelectorAll(".grid-card");
+    const gridBatchSize = 15;
+
+    for (let i = 0; i < allGridCards.length; i += gridBatchSize) {
+      const batch = Array.from(allGridCards).slice(i, i + gridBatchSize);
+      gsap.fromTo(batch, 
+        {
+          opacity: 0,
+          scale: 0.8,
+          y: 30,
+          rotation: 0
+        },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          rotation: 0,
+          duration: 0.6,
+          stagger: 0.05,  // Keep the nice stagger speed
+          ease: "back.out(1.7)",
+          delay: 0.12 + (i / gridBatchSize) * 0.1 // Each batch starts after the previous
+        }
+      );
+    }
+  });
+}
+
+// Animate to Table View
+function animateToTableView(sheetTable, gridWrapper, toggleBtn) {
+  // 1. Animate toggle button
+  gsap.to(toggleBtn, {
+    scale: 0.8,
+    duration: 0.2,
+    ease: "power2.in",
+    onComplete: () => {
+      toggleBtn.textContent = "VIEW: ≡";
+      gsap.to(toggleBtn, {
+        scale: 1.1,
+        duration: 0.3,
+        ease: "back.out(1.7)"
+      });
+    }
+  });
+
+  // 2. Fade out grid with scale
+  gsap.to(gridWrapper, {
+    opacity: 0,
+    scale: 0.95,
+    y: 20,
+    duration: 0.4,
+    ease: "power2.inOut",
+    onComplete: () => {
+      gsap.set(gridWrapper, { display: "none" });
+      gridWrapper.classList.add("hidden");
+    }
+  });
+
+  // 3. Show table and render content
+gsap.set(sheetTable, { display: "table", opacity: 0, scale: 0.9, y: -0 });
+renderTable(filteredRows);
+
+// 4. Fade in table with stagger for rows
+gsap.to(sheetTable, {
+  opacity: 1,
+  scale: 1,
+  y: 0,
+  duration: 0.7,
+  ease: "power2.out",
+  onComplete: () => {
+    toggleBtn.dataset.animating = "false";
+  }
+});
+
+// 5. Stagger animate table rows in batches
+requestAnimationFrame(() => {
+  const allTableRows = document.querySelectorAll("#sheetTable tbody tr");
+  const tableBatchSize = 8;
+
+  for (let i = 0; i < allTableRows.length; i += tableBatchSize) {
+    const batch = Array.from(allTableRows).slice(i, i + tableBatchSize);
+    gsap.fromTo(batch,
+      {
+        opacity: 0,
+        y: -20,        // Slide from top
+        x: 0,          // Explicitly set x to 0 to prevent horizontal movement
+        scale: 1
+      },
+      {
+        opacity: 1,
+        y: 0,          // Slide to final position
+        x: 0,          // Keep x at 0
+        scale: 1,
+        duration: 0.2,
+        stagger: 0.013,  // Keep the nice stagger speed
+        ease: "power2.out",
+        delay: 0.001 + (i / tableBatchSize) * 0.05 // Each batch starts after the previous
+      }
+    );
+  }
+});
+
+// 6. Animate borders separately (fade in from 0 opacity)
+gsap.fromTo("#sheetTable td, #TitleHeader th",
+  {
+    borderColor: "rgba(238, 238, 238, 0)", // Start with invisible borders
+    opacity: 0  // Start with 0 opacity
+  },
+  {
+    borderColor: "rgba(238, 238, 238, 1)", // Fade to visible borders
+    opacity: 1,  // Fade to full opacity
+    duration: 0.4,
+    ease: "power2.out",
+    delay: 0.1
+  }
+);
+}
+
 // ------------------------------
 // GO!
 // ------------------------------

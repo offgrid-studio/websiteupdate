@@ -57,7 +57,7 @@ body {
   background-color: #000;
   color: #fff;
   text-align: left;
-  transform: translateY(0); /* Initial position for animations */
+ /* transform: translateY(0); /* Initial position for animations */
 }
 
 #sheetTable li:hover {
