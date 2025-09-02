@@ -21,10 +21,30 @@ document.addEventListener('DOMContentLoaded', function() {
         hoverTurq: 'Hi I\'m offgrid and I make noise'
     };
     
-    // Simple working typewriter effect
+    // Working typewriter effect with interruption protection
+    let currentTypewriterTimer = null;
+    
     function typewriterEffect(element, text, speed = 50) {
-        // Just display the text normally for now
-        element.textContent = text;
+        // Clear any existing typewriter animation
+        if (currentTypewriterTimer) {
+            clearTimeout(currentTypewriterTimer);
+            currentTypewriterTimer = null;
+        }
+        
+        element.textContent = '';
+        let i = 0;
+        
+        function type() {
+            if (i < text.length) {
+                element.textContent += text.charAt(i);
+                i++;
+                currentTypewriterTimer = setTimeout(type, speed);
+            } else {
+                currentTypewriterTimer = null;
+            }
+        }
+        
+        type();
     }
     
     // Morph from circle to box shape
