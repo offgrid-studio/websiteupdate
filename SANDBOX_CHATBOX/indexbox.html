@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbox Demo</title>
+    <link rel="stylesheet" href="stylebox.css">
+</head>
+<body>
+<div id="chat-root">
+  <div class="chat-bubble" data-state="dot" aria-live="polite">
+    <div class="shine"></div>
+
+    <!-- scrollable content area -->
+    <div class="chat-content" id="chat-scroll" role="region" aria-label="Chat message">
+      <p id="chat-text"></p>
+      <span class="cursor" aria-hidden="true"></span>
+    </div>
+
+    <!-- close button at bottom-right -->
+    <button id="closeChat" class="close-btn" aria-label="Close chat" title="Close chat">×</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Flip.min.js"></script>
+<script src="jsbox.js"></script>
+</body>
+</html>

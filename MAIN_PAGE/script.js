@@ -188,6 +188,11 @@ async function loadCSV() {
   // ---- Initial render
   renderCategoryPills();
   renderTable(filteredRows);
+  
+  // Animate menu elements after table is loaded
+  setTimeout(() => {
+    animateMenuElements();
+  }, 100);
 
   // ---- Hide grid initially
   const gridWrapper = document.getElementById("gridWrapper");
@@ -201,136 +206,198 @@ async function loadCSV() {
 }
 
 // ------------------------------
+// Animate menu elements when table is visible
+// ------------------------------
+function animateMenuElements() {
+  // Animate TitleHeader from top
+  const titleHeader = document.querySelector("#TitleHeader");
+  if (titleHeader) {
+    gsap.fromTo(titleHeader, 
+      {
+        y: -50,
+        opacity: 0
+      },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.out"
+      }
+    );
+  }
+
+  // Animate category pills from bottom with stagger
+  const pills = document.querySelectorAll(".pill");
+  if (pills.length > 0) {
+    gsap.fromTo(pills,
+      {
+        y: 30,
+        opacity: 0,
+        scale: 0.9
+      },
+      {
+        y: 0,
+        opacity: 1,
+        scale: 1,
+        duration: 0.5,
+        stagger: 0.05,
+        ease: "power2.out",
+        delay: 0.2 // Start after TitleHeader
+      }
+    );
+  }
+}
+
+// ------------------------------
 // Table rendering (list view)
 // ------------------------------
 function renderTable(rowObjs) {
   const tbody = document.querySelector("#sheetTable tbody");
   if (!tbody) return;
-  tbody.innerHTML = "";
 
-  rowObjs.forEach(({ id, cells }) => {
-    const tr = document.createElement("tr");
+  // Get existing rows before clearing
+  const existingRows = Array.from(tbody.querySelectorAll("tr"));
 
-    // Image preview URL
-    const rawGifPath = cells[COL.GIF_PATH];
-    const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
-    tr.dataset.previewImage = formattedUrl;
-
-    const tags = parseTags(cells[COL.TAGS]);
-
-    // Ensure players exist even if preload missed something (rare)
-    if (!audioPlayers[id]) audioPlayers[id] = {};
-    const hoverUrl = formatAudioURL(cells[COL.MP3_HOVER]);
-    const clickUrl = formatAudioURL(cells[COL.MP3_CLICK]);
-    if (hoverUrl && !audioPlayers[id].hover)
-      audioPlayers[id].hover = new Tone.Player({ url: hoverUrl, autostart: false }).toDestination();
-    if (clickUrl && !audioPlayers[id].click)
-      audioPlayers[id].click = new Tone.Player({ url: clickUrl, autostart: false }).toDestination();
-
-    // Hook audio to row
-    attachHoverAndClickAudio(tr, id, tags);
-
-    // Row click → open project URL (unless clicking the location pill)
-    const projectUrl = cells[COL.PROJECT_URL];
-    if (projectUrl) {
-      tr.style.cursor = "pointer";
-      tr.addEventListener("click", (e) => {
-        if (e.target.closest(".location")) return;
-        window.open(projectUrl, "_blank", "noopener,noreferrer");
-      });
-    }
-
-    // Tags for pill highlighting
-    tr.dataset.tags = JSON.stringify(tags);
-    tr.addEventListener("mouseenter", () => highlightPills(tags));
-    tr.addEventListener("mouseleave", resetPills);
-
-    // Image preview (requires #imagePreview and #previewContent in DOM)
-    tr.addEventListener("mouseenter", () => {
-      const preview = document.getElementById("imagePreview");
-      const content = document.getElementById("previewContent");
-      if (!preview || !content) return;
-      content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
-      preview.classList.remove("active");
-      void preview.offsetWidth;
-      preview.classList.add("active");
-      clearTimeout(preview.hideTimer);
+  // Animate existing rows sliding down and fading out
+  existingRows.forEach((row, index) => {
+    gsap.to(row, {
+      y: 50,
+      opacity: 0,
+      scale: 0.95,
+      duration: 0.3,
+      delay: index * 0.01,
+      ease: "power2.in"
     });
+  });
 
-    tr.addEventListener("mousemove", (e) => {
-      const preview = document.getElementById("imagePreview");
-      if (!preview) return;
-      preview.style.left = `${e.pageX + 20}px`;
-      preview.style.top = `${e.pageY - 20}px`;
-    });
+  // Wait for rows to slide out, then render new content
+  setTimeout(() => {
+    // Clear tbody
+    tbody.innerHTML = "";
 
-    tr.addEventListener("mouseleave", () => {
-      const preview = document.getElementById("imagePreview");
-      const content = document.getElementById("previewContent");
-      if (!preview || !content) return;
-      preview.hideTimer = setTimeout(() => {
-        preview.classList.remove("active");
-        setTimeout(() => {
-          content.innerHTML = "";
-        }, 500);
-      }, 50);
-    });
+    // Create new rows
+    rowObjs.forEach(({ id, cells }, i) => {
+      const tr = document.createElement("tr");
 
-    // Cells: render first 5 columns (0..4)
-    for (let index = 0; index <= 4; index++) {
-      const cell = cells[index] || "";
-      const td = document.createElement("td");
+      // Image preview URL
+      const rawGifPath = cells[COL.GIF_PATH];
+      const formattedUrl = formatGifURL(rawGifPath) || "https://via.placeholder.com/150";
+      tr.dataset.previewImage = formattedUrl;
 
-      // Special handling for LOCATION column (index 1 in your earlier logic; adjust if needed)
-      if (index === 1 && cell.includes("@")) {
-        const locationUrl = cells[COL.LOCATION_URL];
-        const pill = document.createElement("span");
-        pill.className = "location";
-        pill.textContent = `${cell} 📍`;
-        if (locationUrl && locationUrl.startsWith("http")) {
-          const link = document.createElement("a");
-          link.href = locationUrl;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.appendChild(pill);
-          td.appendChild(link);
-          link.addEventListener("click", (e) => e.stopPropagation());
-        } else {
-          td.appendChild(pill);
-        }
-      } else if (typeof cell === "string" && cell.toLowerCase().includes("places")) {
-        const pill = document.createElement("span");
-        pill.className = "pill";
-        pill.textContent = cell;
-        td.appendChild(pill);
-      } else {
-        td.textContent = cell;
+      const tags = parseTags(cells[COL.TAGS]);
+
+      // Ensure players exist even if preload missed something (rare)
+      if (!audioPlayers[id]) audioPlayers[id] = {};
+      const hoverUrl = formatAudioURL(cells[COL.MP3_HOVER]);
+      const clickUrl = formatAudioURL(cells[COL.MP3_CLICK]);
+      if (hoverUrl && !audioPlayers[id].hover)
+        audioPlayers[id].hover = new Tone.Player({ url: hoverUrl, autostart: false }).toDestination();
+      if (clickUrl && !audioPlayers[id].click)
+        audioPlayers[id].click = new Tone.Player({ url: clickUrl, autostart: false }).toDestination();
+
+      // Hook audio to row
+      attachHoverAndClickAudio(tr, id, tags);
+
+      // Row click → open project URL (unless clicking the location pill)
+      const projectUrl = cells[COL.PROJECT_URL];
+      if (projectUrl) {
+        tr.style.cursor = "pointer";
+        tr.addEventListener("click", (e) => {
+          if (e.target.closest(".location")) return;
+          window.open(projectUrl, "_blank", "noopener,noreferrer");
+        });
       }
 
-      tr.appendChild(td);
-    }
+      // Tags for pill highlighting
+      tr.dataset.tags = JSON.stringify(tags);
+      tr.addEventListener("mouseenter", () => highlightPills(tags));
+      tr.addEventListener("mouseleave", resetPills);
 
-    // GSAP row hover
-    tr.addEventListener("mouseenter", () => {
+      // Image preview (requires #imagePreview and #previewContent in DOM)
+      tr.addEventListener("mouseenter", () => {
+        const preview = document.getElementById("imagePreview");
+        const content = document.getElementById("previewContent");
+        if (!preview || !content) return;
+        content.innerHTML = `<img src="${tr.dataset.previewImage}" style="max-width:150px; border-radius:12px; border:none;">`;
+        preview.classList.remove("active");
+        void preview.offsetWidth;
+        preview.classList.add("active");
+        clearTimeout(preview.hideTimer);
+      });
+
+      tr.addEventListener("mousemove", (e) => {
+        const preview = document.getElementById("imagePreview");
+        if (!preview) return;
+        preview.style.left = `${e.pageX + 20}px`;
+        preview.style.top = `${e.pageY - 20}px`;
+      });
+
+      tr.addEventListener("mouseleave", () => {
+        const preview = document.getElementById("imagePreview");
+        const content = document.getElementById("previewContent");
+        if (!preview || !content) return;
+        preview.hideTimer = setTimeout(() => {
+          preview.classList.remove("active");
+          setTimeout(() => {
+            content.innerHTML = "";
+          }, 500);
+        }, 50);
+      });
+
+      // Cells: render first 5 columns (0..4)
+      for (let index = 0; index <= 4; index++) {
+        const cell = cells[index] || "";
+        const td = document.createElement("td");
+
+        // Special handling for LOCATION column (index 1 in your earlier logic; adjust if needed)
+        if (index === 1 && cell.includes("@")) {
+          const locationUrl = cells[COL.LOCATION_URL];
+          const pill = document.createElement("span");
+          pill.className = "location";
+          pill.textContent = `${cell} 📍`;
+          if (locationUrl && locationUrl.startsWith("http")) {
+            const link = document.createElement("a");
+            link.href = locationUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.appendChild(pill);
+            td.appendChild(link);
+            link.addEventListener("click", (e) => e.stopPropagation());
+          } else {
+            td.appendChild(pill);
+          }
+        } else if (typeof cell === "string" && cell.toLowerCase().includes("places")) {
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          pill.textContent = cell;
+          td.appendChild(pill);
+        } else {
+          td.textContent = cell;
+        }
+
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+
+      // Start row off-screen above
+      gsap.set(tr, {
+        y: -30,
+        opacity: 0,
+        scale: 0.95
+      });
+
+      // Animate row sliding in from top
       gsap.to(tr, {
-        scale: 1.03,
-        duration: 0.3,
-        ease: "power2.out",
-        overwrite: "auto"
+        y: 0,
+        opacity: 1,
+        scale: 1,
+        duration: 0.4,
+        delay: i * 0.02,
+        ease: "power2.out"
       });
     });
-
-    tr.addEventListener("mouseleave", () => {
-      gsap.to(tr, {
-        scale: 1.0,
-        duration: 0.3,
-        ease: "power2.out",
-        overwrite: "auto"
-      });
-    });
-
-    tbody.appendChild(tr);
-  });
+  }, 300); // Wait 300ms for rows to slide out
 }
 
 // ------------------------------
@@ -509,135 +576,173 @@ function attachHoverAndClickAudio(el, stableId, tags) {
 function renderGridView(rowObjs) {
   const grid = document.getElementById("gridView");
   if (!grid) return;
-  grid.innerHTML = "";
 
-  rowObjs.forEach(({ id, cells }, i) => {
-    const gifUrl = formatGifURL(cells[COL.GIF_PATH]) || "https://via.placeholder.com/150";
-    const projectTitle = cells[COL.TITLE] || "";
-    const year = cells[COL.YEAR] || "";
-    const link = cells[COL.PROJECT_URL];
-    const tags = parseTags(cells[COL.TAGS]);
+  // Get existing cards before clearing
+  const existingCards = Array.from(grid.querySelectorAll(".grid-card"));
 
-    const card = document.createElement("div");
-    card.className = "grid-card animated";
-    card.style.animationDelay = `${i * 10}ms`;
-    card.dataset.tags = JSON.stringify(tags);
-
-    card.addEventListener("mouseenter", () => highlightPills(tags));
-    card.addEventListener("mouseleave", resetPills);
-
-    card.innerHTML = `
-      <img src="${gifUrl}" alt="${projectTitle}">
-      <div class="meta">${projectTitle}<br>${year}</div>
-    `;
-
-    if (link) {
-      card.addEventListener("click", () => {
-        window.open(link, "_blank", "noopener,noreferrer");
-      });
-    }
-
-    attachHoverAndClickAudio(card, id, tags);
-    grid.appendChild(card);
+  // Animate existing cards sliding down and fading out
+  existingCards.forEach((card, index) => {
+    gsap.to(card, {
+      y: 100,
+      opacity: 0,
+      scale: 0.9,
+      duration: 0.4,
+      delay: index * 0.02,
+      ease: "power2.in"
+    });
   });
 
-  // GSAP hover with space creation + fisheye effect ⚠️⚠️⚠️⚠️⚠️ WORKS NICELY --- ADJUST! 
-  requestAnimationFrame(() => {
-    document.querySelectorAll(".grid-card").forEach((card) => {
-      card.addEventListener("mouseenter", () => {
-        // Get all other cards
-        const allCards = document.querySelectorAll(".grid-card");
-        const otherCards = Array.from(allCards).filter(c => c !== card);
-        
-        // Animate the hovered card with fisheye effect
-        gsap.to(card, {
-          scale: 1.625,
-          y: -2,
-          duration: 0.5,
-          ease: "power4.out",
-          overwrite: "auto"
+  // Wait for cards to slide out, then render new content
+  setTimeout(() => {
+    // Clear grid
+    grid.innerHTML = "";
+
+    // Create new cards
+    rowObjs.forEach(({ id, cells }, i) => {
+      const gifUrl = formatGifURL(cells[COL.GIF_PATH]) || "https://via.placeholder.com/150";
+      const projectTitle = cells[COL.TITLE] || "";
+      const year = cells[COL.YEAR] || "";
+      const link = cells[COL.PROJECT_URL];
+      const tags = parseTags(cells[COL.TAGS]);
+
+      const card = document.createElement("div");
+      card.className = "grid-card animated";
+      card.style.animationDelay = `${i * 10}ms`;
+      card.dataset.tags = JSON.stringify(tags);
+
+      card.addEventListener("mouseenter", () => highlightPills(tags));
+      card.addEventListener("mouseleave", resetPills);
+
+      card.innerHTML = `
+        <img src="${gifUrl}" alt="${projectTitle}">
+        <div class="meta">${projectTitle}<br>${year}</div>
+      `;
+
+      if (link) {
+        card.addEventListener("click", () => {
+          window.open(link, "_blank", "noopener,noreferrer");
         });
-        
-        // Add fisheye distortion to hovered card
-        gsap.to(card, {
-          filter: "blur(0.5px) brightness(1.1) contrast(1)",
-          duration: 0.3,
-          ease: "power2.out"
-        });
-        
-        card.style.zIndex = "10";
-        
-        // Animate other cards to shrink and move away
-        otherCards.forEach((otherCard, index) => {
-          // Calculate distance and direction from hovered card
-          const cardRect = card.getBoundingClientRect();
-          const otherRect = otherCard.getBoundingClientRect();
-          
-          // Get center points
-          const cardCenterX = cardRect.left + cardRect.width / 2;
-          const cardCenterY = cardRect.top + cardRect.height / 2;
-          const otherCenterX = otherRect.left + otherRect.width / 2;
-          const otherCenterY = otherRect.top + otherRect.height / 2;
-          
-          // Calculate direction vector
-          const deltaX = otherCenterX - cardCenterX;
-          const deltaY = otherCenterY - cardCenterY;
-          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          
-          // Normalize and scale the movement
-          const moveDistance = 75; // How far cards move away
-          const moveX = (deltaX / distance) * moveDistance;
-          const moveY = (deltaY / distance) * moveDistance;
-          
-          // Stagger the animation based on distance
-          const staggerDelay = Math.min(distance / 200, 0.3);
-          
-          // Add fisheye distortion to other cards (more blur for distant ones)
-          const blurAmount = Math.min(distance / 200, 0.125); // More blur for distant cards
-          
-          gsap.to(otherCard, {
-            scale: 0.9,
-            x: moveX,
-            y: moveY,
-            opacity: 1,
-            filter: `blur(${blurAmount}px) brightness(1)`,
-            duration: 1,
-            delay: staggerDelay * 0.2,
-            ease: "power2.out",
-            overwrite: "auto"
-          });
-        });
+      }
+
+      attachHoverAndClickAudio(card, id, tags);
+      grid.appendChild(card);
+
+      // Start card off-screen above
+      gsap.set(card, {
+        y: -100,
+        opacity: 0,
+        scale: 0.9
       });
 
-      card.addEventListener("mouseleave", () => {
-        // Reset hovered card
-        gsap.to(card, {
-          scale: 1,
-          y: 0,
-          filter: "blur(0px) brightness(1) contrast(1)",
-          duration: 0.5,
-          ease: "circ.out",
-          overwrite: "auto"
-        });
-        card.style.zIndex = "1";
-        
-        // Reset all other cards
-        const allCards = document.querySelectorAll(".grid-card");
-        allCards.forEach((otherCard) => {
-          gsap.to(otherCard, {
-            scale: 1,
-            x: 0,
-            y: 0,
-            opacity: 1,
-            filter: "blur(0px) brightness(1)",
-            duration: 0.8,
-            ease: "power2.out",
+      // Animate card sliding in from top
+      gsap.to(card, {
+        y: 0,
+        opacity: 1,
+        scale: 1,
+        duration: 0.5,
+        delay: i * 0.03,
+        ease: "power2.out"
+      });
+    });
+
+    // GSAP hover with space creation + fisheye effect ⚠️⚠️⚠️⚠️⚠️ WORKS NICELY --- ADJUST! 
+    requestAnimationFrame(() => {
+      document.querySelectorAll(".grid-card").forEach((card) => {
+        card.addEventListener("mouseenter", () => {
+          // Get all other cards
+          const allCards = document.querySelectorAll(".grid-card");
+          const otherCards = Array.from(allCards).filter(c => c !== card);
+          
+          // Animate the hovered card with fisheye effect
+          gsap.to(card, {
+            scale: 1.625,
+            y: -2,
+            duration: 0.5,
+            ease: "power4.out",
             overwrite: "auto"
+          });
+          
+          // Add fisheye distortion to hovered card
+          gsap.to(card, {
+            filter: "blur(0.5px) brightness(1.1) contrast(1)",
+            duration: 0.3,
+            ease: "power2.out"
+          });
+          
+          card.style.zIndex = "10";
+          
+          // Animate other cards to shrink and move away
+          otherCards.forEach((otherCard, index) => {
+            // Calculate distance and direction from hovered card
+            const cardRect = card.getBoundingClientRect();
+            const otherRect = otherCard.getBoundingClientRect();
+            
+            // Get center points
+            const cardCenterX = cardRect.left + cardRect.width / 2;
+            const cardCenterY = cardRect.top + cardRect.height / 2;
+            const otherCenterX = otherRect.left + otherRect.width / 2;
+            const otherCenterY = otherRect.top + otherRect.height / 2;
+            
+            // Calculate direction vector
+            const deltaX = otherCenterX - cardCenterX;
+            const deltaY = otherCenterY - cardCenterY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Normalize and scale the movement
+            const moveDistance = 75; // How far cards move away
+            const moveX = (deltaX / distance) * moveDistance;
+            const moveY = (deltaY / distance) * moveDistance;
+            
+            // Stagger the animation based on distance
+            const staggerDelay = Math.min(distance / 200, 0.3);
+            
+            // Add fisheye distortion to other cards (more blur for distant ones)
+            const blurAmount = Math.min(distance / 200, 0.125); // More blur for distant cards
+            
+            gsap.to(otherCard, {
+              scale: 0.9,
+              x: moveX,
+              y: moveY,
+              opacity: 1,
+              filter: `blur(${blurAmount}px) brightness(1)`,
+              duration: 1,
+              delay: staggerDelay * 0.2,
+              ease: "power2.out",
+              overwrite: "auto"
+            });
+          });
+        });
+
+        card.addEventListener("mouseleave", () => {
+          // Reset hovered card
+          gsap.to(card, {
+            scale: 1,
+            y: 0,
+            filter: "blur(0px) brightness(1) contrast(1)",
+            duration: 0.5,
+            ease: "circ.out",
+            overwrite: "auto"
+          });
+          card.style.zIndex = "1";
+          
+          // Reset all other cards
+          const allCards = document.querySelectorAll(".grid-card");
+          allCards.forEach((otherCard) => {
+            gsap.to(otherCard, {
+              scale: 1,
+              x: 0,
+              y: 0,
+              opacity: 1,
+              filter: "blur(0px) brightness(1)",
+              duration: 0.8,
+              ease: "power2.out",
+              overwrite: "auto"
+            });
           });
         });
       });
     });
-  });
+  }, 500); // Wait 500ms for cards to slide out
 }
 
 // ------------------------------
@@ -666,13 +771,25 @@ function renderCategoryPills() {
     }
 
     pill.addEventListener("click", () => {
-      if (selectedCategories.includes(cat)) {
-        selectedCategories = selectedCategories.filter((c) => c !== cat);
+      const isCurrentlySelected = selectedCategories.includes(cat);
+      
+      if (isCurrentlySelected) {
+        // Animate deselection: add a temporary class for animation
+        pill.classList.add("deselecting");
+        setTimeout(() => {
+          selectedCategories = selectedCategories.filter((c) => c !== cat);
+          renderCategoryPills();
+          filterByCategories();
+        }, 400);
       } else {
-        selectedCategories.push(cat);
+        // Animate selection: add a temporary class for animation
+        pill.classList.add("selecting");
+        setTimeout(() => {
+          selectedCategories.push(cat);
+          renderCategoryPills();
+          filterByCategories();
+        }, 200);
       }
-      renderCategoryPills();
-      filterByCategories();
     });
 
     if (selectedCategories.includes(cat)) {
@@ -682,9 +799,14 @@ function renderCategoryPills() {
       x.style.cursor = "pointer";
       x.addEventListener("click", (e) => {
         e.stopPropagation();
-        selectedCategories = selectedCategories.filter((c) => c !== cat);
-        renderCategoryPills();
-        filterByCategories();
+        
+        // Add animation class
+        pill.classList.add("deselecting");
+        setTimeout(() => {
+          selectedCategories = selectedCategories.filter((c) => c !== cat);
+          renderCategoryPills();
+          filterByCategories();
+        }, 500);
       });
       pill.appendChild(x);
     }
@@ -698,9 +820,19 @@ function renderCategoryPills() {
     clearBtn.className = "clear-all-btn";
     clearBtn.textContent = "×";
     clearBtn.addEventListener("click", () => {
-      selectedCategories = [];
-      renderCategoryPills();
-      filterByCategories();
+      // Add animation class to all selected pills
+      const selectedPills = document.querySelectorAll(".pill.selected");
+      selectedPills.forEach((pill, index) => {
+        setTimeout(() => {
+          pill.classList.add("deselecting");
+        }, index * 50);
+      });
+      
+      setTimeout(() => {
+        selectedCategories = [];
+        renderCategoryPills();
+        filterByCategories();
+      }, 400 + (selectedPills.length * 50));
     });
     container.appendChild(clearBtn);
   }
@@ -921,63 +1053,25 @@ function animateToTableView(sheetTable, gridWrapper, toggleBtn) {
   });
 
   // 3. Show table and render content
-gsap.set(sheetTable, { display: "table", opacity: 0, scale: 0.9, y: -0 });
-renderTable(filteredRows);
+  gsap.set(sheetTable, { display: "table", opacity: 0, scale: 0.9, y: -0 });
+  renderTable(filteredRows);
 
-// 4. Fade in table with stagger for rows
-gsap.to(sheetTable, {
-  opacity: 1,
-  scale: 1,
-  y: 0,
-  duration: 0.7,
-  ease: "power2.out",
-  onComplete: () => {
-    toggleBtn.dataset.animating = "false";
-  }
-});
-
-// 5. Stagger animate table rows in batches
-requestAnimationFrame(() => {
-  const allTableRows = document.querySelectorAll("#sheetTable tbody tr");
-  const tableBatchSize = 8;
-
-  for (let i = 0; i < allTableRows.length; i += tableBatchSize) {
-    const batch = Array.from(allTableRows).slice(i, i + tableBatchSize);
-    gsap.fromTo(batch,
-      {
-        opacity: 0,
-        y: -20,        // Slide from top
-        x: 0,          // Explicitly set x to 0 to prevent horizontal movement
-        scale: 1
-      },
-      {
-        opacity: 1,
-        y: 0,          // Slide to final position
-        x: 0,          // Keep x at 0
-        scale: 1,
-        duration: 0.2,
-        stagger: 0.013,  // Keep the nice stagger speed
-        ease: "power2.out",
-        delay: 0.001 + (i / tableBatchSize) * 0.05 // Each batch starts after the previous
-      }
-    );
-  }
-});
-
-// 6. Animate borders separately (fade in from 0 opacity)
-gsap.fromTo("#sheetTable td, #TitleHeader th",
-  {
-    borderColor: "rgba(238, 238, 238, 0)", // Start with invisible borders
-    opacity: 0  // Start with 0 opacity
-  },
-  {
-    borderColor: "rgba(238, 238, 238, 1)", // Fade to visible borders
-    opacity: 1,  // Fade to full opacity
-    duration: 0.4,
+  // 4. Fade in table
+  gsap.to(sheetTable, {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    duration: 0.7,
     ease: "power2.out",
-    delay: 0.1
-  }
-);
+    onComplete: () => {
+      toggleBtn.dataset.animating = "false";
+      
+      // Animate menu elements after table is visible
+      setTimeout(() => {
+        animateMenuElements();
+      }, 100);
+    }
+  });
 }
 
 // ------------------------------
