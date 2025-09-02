@@ -29,5 +29,102 @@ body {
   background: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Pulsating shadow animation for closed state */
+@keyframes pulseShadow {
+  0% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 1.0);
+  }
+  100% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Pulsating shadow animation for open state (faster, synced with typewriter) */
+@keyframes pulseShadowOpen {
+  0% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.8);
+  }
+  100% {
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.3);
+  }
+}
+
+.pulse-shadow {
+  animation: pulseShadow 2s ease-in-out infinite;
+}
+
+.pulse-shadow-open {
+  animation: pulseShadowOpen 0.06s ease-in-out infinite;
+}
+
+.text-content {
+  color: white;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.text-content h3 {
+  margin: 0 0 15px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.text-content p {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.text-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Test squares styling */
+.test-squares {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 100;
+}
+
+.test-square {
+  width: 200px;
+  height: 200px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.test-square:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.red-square {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+}
+
+.blue-square {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+}
+
+.green-square {
+  background: linear-gradient(135deg, #a8e6cf, #7fcdcd);
 }
