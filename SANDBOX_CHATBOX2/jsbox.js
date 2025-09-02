@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Use fixed dimensions that work well with the text content
         const boxWidth = 400;
-        const boxHeight = 200;
+        const boxHeight = 100;
         
         gsap.to(shape, {
             duration: 0.75,
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
             onComplete: () => {
                 // Show text content with typewriter effect after shape morphs
                 gsap.to(textContent, { duration: 0.3, opacity: 1 });
-                typewriterEffect(textContent, textStates.initial, 30);
+                typewriterEffect(textContent, textStates.initial, 5);
             }
         });
         
@@ -123,6 +123,15 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         morphToBox();
     }, 2000);
+    
+    // Function to add pill buttons
+    function addPillButtons() {
+        // Clear existing content and add text + pills
+        textContent.innerHTML = textStates.initial + '<br><br><div class="pill-button" id="pill-1">1) Show me interesting projects</div><div class="pill-button" id="pill-2">2) Learn about us</div>';
+        
+        // Pills are now ready for you to add custom functionality later
+        // Example: if click pill-1 do XYZ, if click pill-2 do ABC
+    }
     
     // Make the shape draggable
     Draggable.create(shape, {
