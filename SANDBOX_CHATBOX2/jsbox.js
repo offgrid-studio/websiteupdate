@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Working typewriter effect with interruption protection
     let currentTypewriterTimer = null;
     
-    function typewriterEffect(element, text, speed = 50) {
+    function typewriterEffect(element, text, speed = 15) {
         // Clear any existing typewriter animation
         if (currentTypewriterTimer) {
             clearTimeout(currentTypewriterTimer);
@@ -34,13 +34,31 @@ document.addEventListener('DOMContentLoaded', function() {
         element.textContent = '';
         let i = 0;
         
+        // Add voice-like pulsating shadow during typing
+        shape.classList.add('voice-pulse');
+        
         function type() {
             if (i < text.length) {
                 element.textContent += text.charAt(i);
                 i++;
-                currentTypewriterTimer = setTimeout(type, speed);
+                
+                // Add mechanical randomness to timing
+                const baseSpeed = speed;
+                const randomVariation = Math.random() * 10 - 0; // ±20ms variation
+                const mechanicalSpeed = baseSpeed + randomVariation;
+                
+                // Check if we just typed a sentence ending
+                const currentChar = text.charAt(i - 1);
+                const sentencePause = (currentChar === '.' || currentChar === '!' || currentChar === '?') ? 150 : 0;
+                
+                // Occasionally add longer pauses (like human thinking)
+                const thinkingPause = Math.random() < 0.2 ? 40 : 0; // 10% chance of 150ms pause
+                
+                currentTypewriterTimer = setTimeout(type, mechanicalSpeed + thinkingPause + sentencePause);
             } else {
                 currentTypewriterTimer = null;
+                // Remove voice-like pulsing when typing is complete
+                shape.classList.remove('voice-pulse');
             }
         }
         
@@ -128,19 +146,55 @@ document.addEventListener('DOMContentLoaded', function() {
     // Dynamic text content based on square hover
     redSquare.addEventListener('mouseenter', function() {
         if (isOpen) {
-            typewriterEffect(textContent, textStates.hoverRed, 30);
+            typewriterEffect(textContent, textStates.hoverRed, 15);
+        }
+    });
+    
+    redSquare.addEventListener('mouseleave', function() {
+        if (isOpen) {
+            // Stop any running typewriter animation
+            if (currentTypewriterTimer) {
+                clearTimeout(currentTypewriterTimer);
+                currentTypewriterTimer = null;
+            }
+            // Display initial text without animation
+            textContent.textContent = textStates.initial;
         }
     });
     
     blueSquare.addEventListener('mouseenter', function() {
         if (isOpen) {
-            typewriterEffect(textContent, textStates.hoverBlue, 30);
+            typewriterEffect(textContent, textStates.hoverBlue, 15);
+        }
+    });
+    
+    blueSquare.addEventListener('mouseleave', function() {
+        if (isOpen) {
+            // Stop any running typewriter animation
+            if (currentTypewriterTimer) {
+                clearTimeout(currentTypewriterTimer);
+                currentTypewriterTimer = null;
+            }
+            // Display initial text without animation
+            textContent.textContent = textStates.initial;
         }
     });
     
     greenSquare.addEventListener('mouseenter', function() {
         if (isOpen) {
-            typewriterEffect(textContent, textStates.hoverTurq, 30);
+            typewriterEffect(textContent, textStates.hoverTurq, 15);
+        }
+    });
+    
+    greenSquare.addEventListener('mouseleave', function() {
+        if (isOpen) {
+            // Stop any running typewriter animation
+            if (currentTypewriterTimer) {
+                clearTimeout(currentTypewriterTimer);
+                currentTypewriterTimer = null;
+            }
+            // Display initial text without animation
+            textContent.textContent = textStates.initial;
         }
     });
     
@@ -148,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
     shape.addEventListener('mouseenter', function() {
         gsap.to(shape, {
             duration: 0.3,
-            scale: 1.1,
+            scale: 1.05,
             ease: "back.out(1.7)"
         });
     });
